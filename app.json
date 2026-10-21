@@ -1,0 +1,39 @@
+{
+  "expo": {
+    "name": "Fashion Floor",
+    "slug": "fashion-floor",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "splash": {
+      "backgroundColor": "#211C18",
+      "resizeMode": "contain"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.fashionfloor.app"
+    },
+    "android": {
+      "package": "com.fashionfloor.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#211C18"
+      }
+    },
+    "plugins": [
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#211C18",
+          "resizeMode": "contain",
+          "android": {
+            "drawable": {
+              "icon": "./assets/splashscreen_logo.xml"
+            }
+          }
+        }
+      ],
+      "expo-asset"
+    ]
+  }
+}
