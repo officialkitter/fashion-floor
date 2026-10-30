@@ -44,6 +44,26 @@ export interface Product {
   brand_tag: BrandTag;
   status: ProductStatus;
   sizes: SizeOption[];
+  category?: string;
+  marketplace_category?: 'featured' | 'other-brand';
+  seller_name?: string;
+  rating?: number;
+  review_count?: number;
+  seller_rating?: number;
+  seller_review_count?: number;
+  units_sold?: number;
+  original_price_minor?: number;
+  catalog_key?: string;
+  colors?: string[];
+  description?: string;
+  material?: string;
+  fit?: string;
+  care?: string;
+  origin?: string;
+  shipping?: string;
+  returns?: string;
+  authenticity?: string;
+  season?: string;
 }
 
 export interface TimeSlot {
@@ -66,6 +86,26 @@ export interface Stylist {
   slots: TimeSlot[];
 }
 
+export interface BuildingService {
+  id: string;
+  name: string;
+  price_minor: number;
+  duration_min: number;
+}
+
+export interface FashionBuilding {
+  id: string;
+  name: string;
+  category: string;
+  city: string;
+  area: string;
+  rating: number;
+  review_count: number;
+  cover_url: string;
+  description: string;
+  services: BuildingService[];
+}
+
 interface CartItemBase {
   id: string;
   /** Kept for order splitting server-side; never surfaced in the UI. */
@@ -83,6 +123,7 @@ export interface ProductCartItem extends CartItemBase {
   kind: 'product';
   product_id: string;
   size: string;
+  color?: string;
   image_url: string;
   brand_tag: BrandTag;
 }
@@ -90,6 +131,7 @@ export interface ProductCartItem extends CartItemBase {
 export interface SalonCartItem extends CartItemBase {
   kind: 'salon';
   stylist_id: string;
+  building_name?: string;
   slot_id: string;
   starts_at: string;
   duration_min: number;

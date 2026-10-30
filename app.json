@@ -5,6 +5,7 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
+    "scheme": "fashionfloor",
     "newArchEnabled": true,
     "splash": {
       "backgroundColor": "#211C18",
@@ -12,7 +13,12 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.fashionfloor.app"
+      "bundleIdentifier": "com.fashionfloor.app",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Use your location to show nearby fashion studios and services.",
+        "NSCameraUsageDescription": "Take a profile photo for your Fashion Floor account.",
+        "NSPhotoLibraryUsageDescription": "Choose a profile photo from your photo library."
+      }
     },
     "android": {
       "package": "com.fashionfloor.app",
@@ -33,7 +39,22 @@
           }
         }
       ],
-      "expo-asset"
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Use your location to show nearby fashion studios and services."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "Allow Fashion Floor to take a profile photo.",
+          "photosPermission": "Allow Fashion Floor to choose a profile photo.",
+          "microphonePermission": false
+        }
+      ],
+      "expo-asset",
+      "expo-secure-store"
     ]
   }
 }

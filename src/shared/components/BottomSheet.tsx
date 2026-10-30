@@ -9,13 +9,23 @@ interface Props {
   visible: boolean;
   onClose: () => void;
   children: ReactNode;
+  surfaceColor?: string;
+  backdropColor?: string;
+  handleColor?: string;
 }
 
 /**
  * Bottom drawer: spring-in, drag-to-dismiss, backdrop fade.
  * Rendered in a Modal so it covers the whole screen even when opened from inside the swipe pager.
  */
-export function BottomSheet({ visible, onClose, children }: Props) {
+export function BottomSheet({
+  visible,
+  onClose,
+  children,
+  surfaceColor = colors.white,
+  backdropColor = colors.black,
+  handleColor = 'rgba(255,252,248,0.9)',
+}: Props) {
   const { height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const [mounted, setMounted] = useState(visible);
@@ -55,13 +65,13 @@ export function BottomSheet({ visible, onClose, children }: Props) {
   return (
     <Modal visible={mounted} transparent animationType="none" onRequestClose={onClose} statusBarTranslucent>
       <GestureHandlerRootView style={styles.root}>
-        <Animated.View style={[StyleSheet.absoluteFill, styles.backdrop, backdropStyle]}>
+        <Animated.View style={[StyleSheet.absoluteFill, styles.backdrop, { backgroundColor: backdropColor }, backdropStyle]}>
           <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="Close" />
         </Animated.View>
-        <Animated.View style={[styles.sheet, { paddingBottom: insets.bottom + 16 }, sheetStyle]}>
+        <Animated.View style={[styles.sheet, { paddingBottom: insets.bottom + 16, backgroundColor: surfaceColor }, sheetStyle]}>
           <GestureDetector gesture={drag}>
             <View style={styles.handleArea}>
-              <View style={styles.handle} />
+              <View style={[styles.handle, { backgroundColor: handleColor }]} />
             </View>
           </GestureDetector>
           {children}

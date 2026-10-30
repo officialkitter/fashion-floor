@@ -8,14 +8,17 @@ interface Props {
   status: Status;
   /** Override the default label (e.g. "Fully booked"). */
   label?: string;
+  accentColor?: string;
+  surfaceColor?: string;
+  textColor?: string;
 }
 
-export function StatusPill({ status, label }: Props) {
+export function StatusPill({ status, label, accentColor, surfaceColor, textColor }: Props) {
   const meta = STATUS_META[status];
   return (
-    <View style={styles.pill}>
-      <View style={[styles.dot, { backgroundColor: meta.color }]} />
-      <Text style={styles.text}>{label ?? meta.label}</Text>
+    <View style={[styles.pill, surfaceColor ? { backgroundColor: surfaceColor } : null]}>
+      <View style={[styles.dot, { backgroundColor: accentColor ?? meta.color }]} />
+      <Text style={[styles.text, textColor ? { color: textColor } : null]}>{label ?? meta.label}</Text>
     </View>
   );
 }

@@ -1,0 +1,17 @@
+{
+  "expo": {
+    "name": "Fashion Floor Admin",
+    "slug": "fashion-floor-admin",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "splash": { "backgroundColor": "#30231D", "resizeMode": "contain" },
+    "ios": { "supportsTablet": true, "bundleIdentifier": "com.fashionfloor.admin" },
+    "android": {
+      "package": "com.fashionfloor.admin",
+      "adaptiveIcon": { "backgroundColor": "#30231D" }
+    },
+    "plugins": ["expo-splash-screen"]
+  }
+}

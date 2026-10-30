@@ -1,0 +1,16 @@
+project_id = "iylafpnuvdabmydpomgo"
+
+[api]
+enabled = true
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+major_version = 15
+
+[auth]
+enabled = true
+site_url = "http://localhost:8081"
+additional_redirect_urls = ["fashionfloor://"]
+enable_signup = true

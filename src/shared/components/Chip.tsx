@@ -13,6 +13,8 @@ interface Props {
   /** Fill when active. Defaults to Mint Green (success / active booking). */
   activeColor?: string;
   activeTextColor?: string;
+  inactiveColor?: string;
+  inactiveTextColor?: string;
   /** Small status dot, e.g. amber for low stock or a held slot. */
   dotColor?: string;
   accessibilityLabel?: string;
@@ -25,6 +27,8 @@ export function Chip({
   onPress,
   activeColor = colors.success,
   activeTextColor = colors.black,
+  inactiveColor = colors.offWhite,
+  inactiveTextColor = colors.black,
   dotColor,
   accessibilityLabel,
 }: Props) {
@@ -34,10 +38,10 @@ export function Chip({
   }, [state, progress]);
 
   const bg = useAnimatedStyle(() => ({
-    backgroundColor: interpolateColor(progress.value, [0, 1], [colors.offWhite, activeColor]),
+    backgroundColor: interpolateColor(progress.value, [0, 1], [inactiveColor, activeColor]),
   }));
   const txt = useAnimatedStyle(() => ({
-    color: interpolateColor(progress.value, [0, 1], [colors.black, activeTextColor]),
+    color: interpolateColor(progress.value, [0, 1], [inactiveTextColor, activeTextColor]),
   }));
 
   const disabled = state === 'disabled';

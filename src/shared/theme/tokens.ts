@@ -1,6 +1,6 @@
 import type { TextStyle } from 'react-native';
 
-/** Fashion Floor's warm editorial palette. Status colors are utility-only. */
+/** Fashion Floor's coffee-brown platform palette. Status colors are utility-only. */
 export const colors = {
   black: '#211C18', // headers, active elements, primary buttons
   white: '#FFFCF8', // primary canvas
@@ -12,6 +12,20 @@ export const colors = {
   success: '#00C781', // success / active booking / paid
   warning: '#FF9500', // pending / processing / low stock
   danger: '#FF3B30', // cancelled / out of stock / error
+} as const;
+
+/** Fresh green palette for the Lounge department. */
+export const loungeColors = {
+  black: '#20352F',
+  white: '#F9FBF8',
+  charcoal: '#354741',
+  slate: '#71817A',
+  offWhite: '#EDF2EE',
+  sand: '#DCE7DF',
+  terracotta: '#28775C',
+  success: '#28775C',
+  warning: '#FF9500',
+  danger: '#FF3B30',
 } as const;
 
 export const space = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32 } as const;

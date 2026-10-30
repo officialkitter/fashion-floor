@@ -11,11 +11,21 @@ interface Props {
   disabled?: boolean;
   /** Right-aligned text, e.g. a running total. */
   trailing?: string;
+  backgroundColor?: string;
+  textColor?: string;
 }
 
-export function PrimaryButton({ label, onPress, variant = 'primary', disabled, trailing }: Props) {
+export function PrimaryButton({
+  label,
+  onPress,
+  variant = 'primary',
+  disabled,
+  trailing,
+  backgroundColor,
+  textColor: customTextColor,
+}: Props) {
   const primary = variant === 'primary';
-  const textColor = primary ? colors.white : colors.black;
+  const textColor = customTextColor ?? (primary ? colors.white : colors.black);
 
   return (
     <PressableScale
@@ -26,7 +36,12 @@ export function PrimaryButton({ label, onPress, variant = 'primary', disabled, t
       }}
       accessibilityRole="button"
       accessibilityLabel={trailing ? `${label}, ${trailing}` : label}
-      style={[styles.base, primary ? styles.primary : styles.secondary, disabled && styles.disabled]}
+      style={[
+        styles.base,
+        primary ? styles.primary : styles.secondary,
+        backgroundColor ? { backgroundColor, borderColor: backgroundColor } : null,
+        disabled && styles.disabled,
+      ]}
     >
       <Text style={[styles.label, { color: textColor }]}>{label}</Text>
       {trailing ? <Text style={[styles.label, { color: textColor }]}>{trailing}</Text> : null}

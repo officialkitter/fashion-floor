@@ -1,7 +1,7 @@
 import React from 'react';
 import * as Haptics from 'expo-haptics';
 import { Chip, ChipState } from '../../shared/components/Chip';
-import { colors } from '../../shared/theme/tokens';
+import { loungeColors } from '../../shared/theme/tokens';
 import type { Stylist, TimeSlot } from '../../shared/types/domain';
 import { formatTime } from '../../shared/utils/format';
 import { selectHasSlot, useCartStore } from '../cart/cartStore';
@@ -9,10 +9,11 @@ import { selectHasSlot, useCartStore } from '../cart/cartStore';
 interface Props {
   stylist: Stylist;
   slot: TimeSlot;
+  buildingName?: string;
 }
 
 /** One tap reserves the slot: the chip turns Mint Green and joins the unified cart. */
-export function SlotChip({ stylist, slot }: Props) {
+export function SlotChip({ stylist, slot, buildingName }: Props) {
   const selected = useCartStore(selectHasSlot(slot.id));
   const toggleSlot = useCartStore((s) => s.toggleSlot);
 
@@ -24,13 +25,17 @@ export function SlotChip({ stylist, slot }: Props) {
     <Chip
       label={time}
       state={state}
-      dotColor={slot.status === 'held' ? colors.warning : undefined}
+      activeColor={loungeColors.success}
+      activeTextColor={loungeColors.white}
+      inactiveColor={loungeColors.offWhite}
+      inactiveTextColor={loungeColors.black}
+      dotColor={slot.status === 'held' ? loungeColors.warning : undefined}
       accessibilityLabel={
         available ? `${selected ? 'Release' : 'Book'} ${time} with ${stylist.name}` : `${time}, ${slot.status}`
       }
       onPress={() => {
         Haptics.selectionAsync();
-        toggleSlot(stylist, slot);
+        toggleSlot(stylist, slot, buildingName);
       }}
     />
   );

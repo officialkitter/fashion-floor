@@ -5,9 +5,9 @@ import type { CartItem, Product, SalonCartItem, Stylist, TimeSlot } from '../../
 
 interface CartState {
   items: CartItem[];
-  addProduct: (product: Product, size: string) => void;
+  addProduct: (product: Product, size: string, color?: string) => void;
   /** Tap once to reserve a slot, tap again to release. One slot per stylist. */
-  toggleSlot: (stylist: Stylist, slot: TimeSlot) => void;
+  toggleSlot: (stylist: Stylist, slot: TimeSlot, buildingName?: string) => void;
   remove: (id: string) => void;
   clear: () => void;
 }
@@ -17,9 +17,9 @@ export const useCartStore = create<CartState>()(
     (set) => ({
       items: [],
 
-      addProduct: (product, size) =>
+      addProduct: (product, size, color) =>
         set((state) => {
-          const id = `p:${product.id}:${size}`;
+          const id = `p:${product.id}:${size}:${color ?? ''}`;
           const stock = product.sizes.find((s) => s.size === size)?.stock ?? 0;
           const existing = state.items.find((i) => i.id === id);
 
@@ -40,8 +40,9 @@ export const useCartStore = create<CartState>()(
                 vendor_id: product.vendor_id,
                 product_id: product.id,
                 title: product.title,
-                subtitle: `Size ${size}`,
+                subtitle: `Size ${size}${color ? ` · ${color}` : ''}`,
                 size,
+                color,
                 image_url: product.images[0] ?? '',
                 brand_tag: product.brand_tag,
                 unit_price_minor: product.price_minor,
@@ -54,7 +55,7 @@ export const useCartStore = create<CartState>()(
           };
         }),
 
-      toggleSlot: (stylist, slot) =>
+      toggleSlot: (stylist, slot, buildingName) =>
         set((state) => {
           const id = `s:${slot.id}`;
           if (state.items.some((i) => i.id === id)) {
@@ -65,6 +66,7 @@ export const useCartStore = create<CartState>()(
             id,
             vendor_id: stylist.vendor_id,
             stylist_id: stylist.id,
+            building_name: buildingName,
             slot_id: slot.id,
             title: stylist.name,
             subtitle: `${stylist.role} · ${slot.duration_min} min`,
@@ -88,7 +90,7 @@ export const useCartStore = create<CartState>()(
       clear: () => set({ items: [] }),
     }),
     {
-      name: 'cart',
+      name: 'cart-tzs-v2',
       storage: createJSONStorage(() => mmkvStorage),
       partialize: (s) => ({ items: s.items }),
     },
@@ -101,7 +103,7 @@ export const selectSubtotal = (s: { items: CartItem[] }) =>
   s.items.reduce((sum, i) => sum + i.unit_price_minor * i.quantity, 0);
 
 /** Assumes a single storefront currency; take it from the first line. */
-export const selectCurrency = (s: { items: CartItem[] }) => s.items[0]?.currency ?? 'USD';
+export const selectCurrency = (s: { items: CartItem[] }) => s.items[0]?.currency ?? 'TZS';
 
 export const selectHasSlot = (slotId: string) => (s: { items: CartItem[] }) =>
   s.items.some((i) => i.kind === 'salon' && i.slot_id === slotId);
