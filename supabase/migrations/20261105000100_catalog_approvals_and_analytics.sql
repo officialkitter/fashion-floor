@@ -5,7 +5,16 @@ alter table public.products
 
 update public.products
 set approval_status = 'published'
-where is_active;
+where is_active and exists (
+  select 1
+  from pg_catalog.unnest(images) as image_entry(url)
+  where pg_catalog.btrim(image_entry.url) ~* '^https?://'
+);
+
+update public.products
+set approval_status = 'pending',
+    is_active = false
+where is_active and approval_status = 'pending';
 
 alter table public.business_services
   add column approval_status public.product_review_status not null default 'pending',
@@ -14,12 +23,83 @@ alter table public.business_services
 
 update public.business_services
 set approval_status = 'published'
-where is_active;
+where is_active and exists (
+  select 1
+  from public.businesses business
+  where business.id = business_services.business_id
+    and pg_catalog.btrim(coalesce(business.cover_url, '')) ~* '^https?://'
+);
+
+update public.business_services
+set approval_status = 'pending',
+    is_active = false
+where is_active and approval_status = 'pending';
 
 create index products_approval_status_idx
   on public.products (approval_status, created_at desc);
 create index business_services_approval_status_idx
   on public.business_services (approval_status, business_id);
+
+create or replace view public.product_cards with (security_invoker = true) as
+select
+  p.id,
+  p.vendor_id,
+  p.title,
+  p.price_minor,
+  p.original_price_minor,
+  p.currency,
+  p.images,
+  jsonb_build_object(
+    'id', b.id,
+    'label', b.name,
+    'vendor_id', coalesce(b.vendor_id, p.vendor_id),
+    'tone', 'dark',
+    'partnership_status', b.partnership_status::text,
+    'is_local', b.vendor_id is not null
+  ) as brand_tag,
+  case
+    when coalesce(stock.total, 0) = 0 then 'out_of_stock'
+    when stock.total <= 3 then 'low_stock'
+    else 'in_stock'
+  end as status,
+  p.sizes,
+  p.category,
+  p.listing_type as marketplace_category,
+  s.name as seller_name,
+  coalesce(pr.rating, 0)::numeric(3, 1) as rating,
+  coalesce(pr.review_count, 0)::integer as review_count,
+  coalesce(sr.rating, 0)::numeric(3, 1) as seller_rating,
+  coalesce(sr.review_count, 0)::integer as seller_review_count,
+  0::integer as units_sold,
+  p.catalog_key,
+  p.colors,
+  p.description,
+  p.material,
+  p.fit,
+  p.care,
+  p.origin,
+  p.shipping,
+  p.returns,
+  p.authenticity,
+  p.season
+from public.products p
+join public.brands b on b.id = p.brand_id and b.is_active
+join public.stores s on s.id = p.store_id and s.is_active
+left join lateral (
+  select sum((entry.value ->> 'stock')::integer) as total
+  from jsonb_array_elements(p.sizes) entry(value)
+) stock on true
+left join lateral (
+  select avg(r.rating)::numeric as rating, count(*) as review_count
+  from public.product_reviews r
+  where r.product_id = p.id and r.status = 'published'
+) pr on true
+left join lateral (
+  select avg(r.rating)::numeric as rating, count(*) as review_count
+  from public.store_reviews r
+  where r.store_id = s.id and r.status = 'published'
+) sr on true
+where p.is_active and p.approval_status = 'published';
 
 create or replace function public.has_permission(permission_key text)
 returns boolean
@@ -129,12 +209,40 @@ create policy "Approved products at active stores are public"
     and store_id in (select s.id from public.stores s where s.is_active)
   );
 
+drop policy if exists "Authorized catalog managers can read products" on public.products;
+create policy "Catalog staff can read products in their access scope"
+  on public.products for select to authenticated
+  using (
+    public.has_permission('catalog.view')
+    and (
+      public.has_role(array['super_admin', 'admin', 'finance', 'support']::public.platform_role[])
+      or public.owns_vendor(vendor_id)
+    )
+  );
+
 drop policy if exists "Services at active businesses are public" on public.business_services;
 create policy "Approved services at active businesses are public"
   on public.business_services for select to anon, authenticated
   using (
     is_active and approval_status = 'published'
-    and business_id in (select b.id from public.businesses b where b.is_active)
+    and business_id in (
+      select b.id
+      from public.businesses b
+      where b.is_active and pg_catalog.btrim(coalesce(b.cover_url, '')) ~* '^https?://'
+    )
+  );
+
+drop policy if exists "Authorized staff can read business services" on public.business_services;
+create policy "Catalog staff can read services in their access scope"
+  on public.business_services for select to authenticated
+  using (
+    public.has_permission('catalog.view')
+    and business_id in (
+      select business.id
+      from public.businesses business
+      where public.has_role(array['super_admin', 'admin', 'finance', 'support']::public.platform_role[])
+        or public.owns_vendor(business.vendor_id)
+    )
   );
 
 create or replace view public.admin_products as
@@ -186,7 +294,7 @@ select
   service.duration_min,
   service.is_active,
   service.approval_status,
-  service.created_at,
+  null::timestamptz as created_at,
   service.reviewed_at
 from public.business_services service
 join public.businesses business on business.id = service.business_id
@@ -229,7 +337,11 @@ begin
     or pg_catalog.btrim(product_row.description) = ''
     or pg_catalog.btrim(product_row.category) = ''
     or product_row.price_minor <= 0
-    or pg_catalog.cardinality(product_row.images) = 0
+    or not exists (
+      select 1
+      from pg_catalog.unnest(product_row.images) as image_entry(url)
+      where pg_catalog.btrim(image_entry.url) ~* '^https?://'
+    )
     or not exists (
       select 1
       from pg_catalog.jsonb_array_elements(product_row.sizes) entry(value)
@@ -286,7 +398,7 @@ begin
     or pg_catalog.btrim(service_row.description) = ''
     or service_row.price_minor <= 0
     or service_row.duration_min <= 0
-    or pg_catalog.coalesce(business_image, '') = ''
+    or pg_catalog.btrim(coalesce(business_image, '')) !~* '^https?://'
   ) then
     raise exception 'Add a clear description, price, duration, and business photo before approval.' using errcode = '22023';
   end if;

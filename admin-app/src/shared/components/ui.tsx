@@ -19,6 +19,7 @@ const TONES: Record<string, { color: string; label: string }> = {
   paid: { color: colors.success, label: 'Paid' },
   booked: { color: colors.success, label: 'Booked' },
   approved: { color: colors.success, label: 'Approved' },
+  published: { color: colors.success, label: 'Approved' },
   active: { color: colors.success, label: 'Active' },
   available: { color: colors.success, label: 'Available' },
   pending: { color: colors.warning, label: 'Pending' },

@@ -25,6 +25,8 @@ export interface BrandTag {
   id: string;
   label: string;
   vendor_id: string;
+  partnership_status?: 'unaffiliated' | 'pending' | 'verified';
+  is_local?: boolean;
   /** Overlay style on product imagery. */
   tone: 'dark' | 'light';
 }

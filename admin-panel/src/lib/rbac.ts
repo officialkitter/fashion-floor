@@ -7,6 +7,7 @@ export type Permission =
   | 'bookings.manage'
   | 'catalog.view'
   | 'catalog.manage'
+  | 'catalog.approve'
   | 'partners.view'
   | 'partners.manage'
   | 'team.view'
@@ -32,11 +33,10 @@ export const PERMISSION_LABELS: { key: Permission; label: string; group: string 
   { key: 'bookings.manage', label: 'Update appointments', group: 'Appointments' },
   { key: 'catalog.view', label: 'View product catalog', group: 'Catalog' },
   { key: 'catalog.manage', label: 'Manage catalog', group: 'Catalog' },
+  { key: 'catalog.approve', label: 'Approve products and services', group: 'Catalog' },
   { key: 'partners.view', label: 'View suppliers and providers', group: 'Partners' },
   { key: 'partners.manage', label: 'Manage partners', group: 'Partners' },
   { key: 'team.view', label: 'View team', group: 'Team' },
-  { key: 'team.manage', label: 'Manage team', group: 'Team' },
   { key: 'roles.view', label: 'View role permissions', group: 'Access' },
-  { key: 'roles.edit', label: 'Edit role permissions', group: 'Access' },
   { key: 'finance.view', label: 'View financial amounts', group: 'Finance' },
 ];

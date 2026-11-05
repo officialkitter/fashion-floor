@@ -1,4 +1,4 @@
-import type { Booking, Customer, Order, OrderItem, Partner, Product } from './data';
+import type { Booking, BusinessService, Customer, Order, OrderItem, Partner, Product } from './data';
 import type { Role } from './rbac';
 import { supabase } from './supabase';
 
@@ -32,6 +32,9 @@ const customerFrom = (row: Row): Customer => {
   };
 };
 const relationList = (row: Row, ...keys: string[]) => list(value(row, ...keys)).filter(isRow);
+const REVIEW_STATUSES = ['pending', 'published', 'rejected'] as const;
+const reviewStatus = (input: unknown) =>
+  REVIEW_STATUSES.find((status) => status === text(input)) ?? 'pending';
 
 export function roleFrom(value_: unknown): Role | null {
   const key = text(value_).toLowerCase();
@@ -136,11 +139,42 @@ export function productFrom(row: Row): Product {
       : numeric(value(row, 'price', 'unit_price')),
     currency: text(value(row, 'currency', 'currency_code'), 'TZS'),
     stock,
+    stockTarget: numeric(value(row, 'stock_target')),
+    priceConfirmed: Boolean(value(row, 'price_confirmed')),
+    brandPartnershipStatus: text(value(row, 'brand_partnership_status'), 'unaffiliated'),
+    brandApprovalStatus: reviewStatus(value(row, 'brand_approval_status')),
+    storeApprovalStatus: reviewStatus(value(row, 'store_approval_status')),
+    partnerStatus: text(value(row, 'partner_status'), 'pending'),
     status: text(value(row, 'status'), value(row, 'is_active') === false
       ? 'inactive'
       : stock <= 0 ? 'out_of_stock' : stock <= 3 ? 'low_stock' : 'in_stock'),
     sizes,
     images: images.length ? images : image ? [image] : [],
+    approvalStatus: reviewStatus(value(row, 'approval_status')),
+    description: text(value(row, 'description')),
+    createdAt: text(value(row, 'created_at')),
+  };
+}
+
+function serviceFrom(row: Row): BusinessService {
+  return {
+    id: text(value(row, 'id', 'service_id')),
+    partnerId: text(value(row, 'vendor_id', 'partner_id')),
+    businessName: text(value(row, 'business_name')),
+    category: text(value(row, 'business_category')),
+    coverUrl: text(value(row, 'cover_url')),
+    name: text(value(row, 'name', 'service_name'), 'Service'),
+    description: text(value(row, 'description')),
+    price: value(row, 'price_minor') !== undefined
+      ? numeric(value(row, 'price_minor')) / 100
+      : numeric(value(row, 'price')),
+    currency: text(value(row, 'currency', 'currency_code'), 'TZS'),
+    durationMinutes: numeric(value(row, 'duration_min')),
+    active: Boolean(value(row, 'is_active')),
+    approvalStatus: reviewStatus(value(row, 'approval_status')),
+    priceConfirmed: Boolean(value(row, 'price_confirmed')),
+    businessApprovalStatus: reviewStatus(value(row, 'business_approval_status')),
+    partnerStatus: text(value(row, 'partner_status'), 'pending'),
   };
 }
 
@@ -170,13 +204,14 @@ export function partnerFrom(row: Row): Partner {
 
 export async function fetchAdminData() {
   if (!supabase) throw new Error('Supabase is not configured for live mode.');
-  const [orders, bookings, products, partners] = await Promise.all([
+  const [orders, bookings, products, partners, services] = await Promise.all([
     supabase.from('admin_orders').select('*'),
     supabase.from('admin_bookings').select('*'),
     supabase.from('admin_products').select('*'),
     supabase.from('admin_partners').select('*'),
+    supabase.from('admin_services').select('*'),
   ]);
-  for (const result of [orders, bookings, products, partners]) {
+  for (const result of [orders, bookings, products, partners, services]) {
     if (result.error) throw result.error;
   }
   return {
@@ -184,5 +219,6 @@ export async function fetchAdminData() {
     bookings: (bookings.data ?? []).map((row) => bookingFrom(row as Row)).sort((a, b) => a.startsAt.localeCompare(b.startsAt)),
     products: (products.data ?? []).map((row) => productFrom(row as Row)),
     partners: (partners.data ?? []).map((row) => partnerFrom(row as Row)),
+    services: (services.data ?? []).map((row) => serviceFrom(row as Row)),
   };
 }

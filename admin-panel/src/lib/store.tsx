@@ -2,17 +2,17 @@
 
 import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import type { AuthChangeEvent, Session } from '@supabase/supabase-js';
-import type { Booking, BookingStatus, LoungeDirectoryLead, Order, OrderStatus, Partner, Product, AdminUser } from './data';
+import type { Booking, BookingStatus, BusinessService, LoungeDirectoryLead, Order, OrderStatus, Partner, Product, AdminUser } from './data';
 import { getSupabase, hasSupabaseConfig } from './supabase';
 import type { Permission, Role } from './rbac';
 
 const PERMISSIONS: Permission[] = [
   'dashboard.view', 'orders.view', 'orders.manage', 'bookings.view', 'bookings.manage',
-  'catalog.view', 'catalog.manage', 'partners.view', 'partners.manage', 'team.view',
+  'catalog.view', 'catalog.manage', 'catalog.approve', 'partners.view', 'partners.manage', 'team.view',
   'team.manage', 'roles.view', 'roles.edit', 'finance.view',
 ];
 
-type QueryKey = 'orders' | 'bookings' | 'products' | 'partners' | 'loungeLeads';
+type QueryKey = 'orders' | 'bookings' | 'products' | 'services' | 'partners' | 'loungeLeads';
 interface StoreValue {
   ready: boolean;
   dataLoading: boolean;
@@ -25,6 +25,7 @@ interface StoreValue {
   orders: Order[];
   bookings: Booking[];
   products: Product[];
+  services: BusinessService[];
   partners: Partner[];
   loungeLeads: LoungeDirectoryLead[];
   login: (email: string, password: string) => Promise<{ ok: boolean; reason?: string }>;
@@ -33,6 +34,9 @@ interface StoreValue {
   refresh: () => Promise<void>;
   setOrderStatus: (id: string, status: OrderStatus) => Promise<void>;
   setBookingStatus: (id: string, status: BookingStatus) => Promise<void>;
+  reviewProduct: (id: string, decision: 'published' | 'rejected') => Promise<void>;
+  reviewService: (id: string, decision: 'published' | 'rejected') => Promise<void>;
+  setPartnerStatus: (id: string, status: 'approved' | 'rejected') => Promise<void>;
 }
 
 const Ctx = createContext<StoreValue | null>(null);
@@ -92,9 +96,40 @@ function mapProduct(row: any): Product {
     price: Number(row.price_minor) / 100,
     currency: row.currency || 'TZS',
     stock: Number(row.stock ?? 0),
+    stockTarget: Number(row.stock_target ?? 0),
+    priceConfirmed: Boolean(row.price_confirmed),
+    brandPartnershipStatus: row.brand_partnership_status ?? 'unaffiliated',
+    brandApprovalStatus: row.brand_approval_status ?? 'pending',
+    verificationReference: row.verification_reference ?? '',
+    storeApprovalStatus: row.store_approval_status ?? 'pending',
+    partnerStatus: row.partner_status ?? 'pending',
     sizes,
     images: row.images ?? [],
     active: Boolean(row.is_active),
+    approvalStatus: row.approval_status,
+    description: row.description ?? '',
+    createdAt: row.created_at,
+  };
+}
+
+function mapService(row: any): BusinessService {
+  return {
+    id: row.id,
+    vendorId: row.vendor_id,
+    businessName: row.business_name ?? '',
+    category: row.business_category ?? '',
+    coverUrl: row.cover_url ?? '',
+    name: row.name,
+    description: row.description ?? '',
+    price: Number(row.price_minor) / 100,
+    currency: row.currency || 'TZS',
+    durationMinutes: Number(row.duration_min),
+    active: Boolean(row.is_active),
+    approvalStatus: row.approval_status,
+    priceConfirmed: Boolean(row.price_confirmed),
+    businessApprovalStatus: row.business_approval_status ?? 'pending',
+    partnerStatus: row.partner_status ?? 'pending',
+    createdAt: row.created_at ?? '',
   };
 }
 
@@ -141,6 +176,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [orders, setOrders] = useState<Order[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [services, setServices] = useState<BusinessService[]>([]);
   const [partners, setPartners] = useState<Partner[]>([]);
   const [loungeLeads, setLoungeLeads] = useState<LoungeDirectoryLead[]>([]);
 
@@ -150,6 +186,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setOrders([]);
     setBookings([]);
     setProducts([]);
+    setServices([]);
     setPartners([]);
     setLoungeLeads([]);
     setQueryErrors({});
@@ -224,21 +261,24 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     if (!supabase || !user) return;
     setDataLoading(true);
     const errors: Partial<Record<QueryKey, string>> = {};
-    const [orderResult, bookingResult, productResult, partnerResult, loungeLeadResult] = await Promise.all([
+    const [orderResult, bookingResult, productResult, serviceResult, partnerResult, loungeLeadResult] = await Promise.all([
       permissions.includes('orders.view') ? supabase.from('admin_orders').select('*').order('created_at', { ascending: false }) : Promise.resolve({ data: [], error: null }),
       permissions.includes('bookings.view') ? supabase.from('admin_bookings').select('*').order('starts_at', { ascending: true }) : Promise.resolve({ data: [], error: null }),
       permissions.includes('catalog.view') ? supabase.from('admin_products').select('*').order('title', { ascending: true }) : Promise.resolve({ data: [], error: null }),
+      permissions.includes('catalog.view') ? supabase.from('admin_services').select('*').order('name', { ascending: true }) : Promise.resolve({ data: [], error: null }),
       permissions.includes('partners.view') ? supabase.from('admin_partners').select('*').order('created_at', { ascending: false }) : Promise.resolve({ data: [], error: null }),
       permissions.includes('partners.view') ? supabase.from('lounge_directory_leads').select('*').order('reference_code', { ascending: true }) : Promise.resolve({ data: [], error: null }),
     ]);
     if (orderResult.error) errors.orders = errorText(orderResult.error);
     if (bookingResult.error) errors.bookings = errorText(bookingResult.error);
     if (productResult.error) errors.products = errorText(productResult.error);
+    if (serviceResult.error) errors.services = errorText(serviceResult.error);
     if (partnerResult.error) errors.partners = errorText(partnerResult.error);
     if (loungeLeadResult.error) errors.loungeLeads = errorText(loungeLeadResult.error);
     setOrders(((orderResult.data ?? []) as any[]).map(mapOrder));
     setBookings(((bookingResult.data ?? []) as any[]).map(mapBooking));
     setProducts(((productResult.data ?? []) as any[]).map(mapProduct));
+    setServices(((serviceResult.data ?? []) as any[]).map(mapService));
     setPartners(((partnerResult.data ?? []) as any[]).map(mapPartner));
     setLoungeLeads(((loungeLeadResult.data ?? []) as any[]).map(mapLoungeLead));
     setQueryErrors(errors);
@@ -329,10 +369,43 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     await refresh();
   }, [refresh]);
 
+  const setPartnerStatus = useCallback(async (id: string, status: 'approved' | 'rejected') => {
+    const supabase = getSupabase();
+    if (!supabase) throw new Error('Supabase is not configured.');
+    const { error } = await supabase.rpc('set_vendor_status', {
+      target_vendor_id: id,
+      next_status: status,
+    });
+    if (error) throw new Error(error.message);
+    await refresh();
+  }, [refresh]);
+
+  const reviewProduct = useCallback(async (id: string, decision: 'published' | 'rejected') => {
+    const supabase = getSupabase();
+    if (!supabase) throw new Error('Supabase is not configured.');
+    const { error } = await supabase.rpc('review_product', {
+      target_product_id: id,
+      decision,
+    });
+    if (error) throw new Error(error.message);
+    await refresh();
+  }, [refresh]);
+
+  const reviewService = useCallback(async (id: string, decision: 'published' | 'rejected') => {
+    const supabase = getSupabase();
+    if (!supabase) throw new Error('Supabase is not configured.');
+    const { error } = await supabase.rpc('review_business_service', {
+      target_service_id: id,
+      decision,
+    });
+    if (error) throw new Error(error.message);
+    await refresh();
+  }, [refresh]);
+
   const value = useMemo<StoreValue>(() => ({
     ready, dataLoading, configMissing, authError, queryErrors, user, role: user?.role ?? null, permissions,
-    orders, bookings, products, partners, loungeLeads, login, logout, changePassword, refresh, setOrderStatus, setBookingStatus,
-  }), [ready, dataLoading, configMissing, authError, queryErrors, user, permissions, orders, bookings, products, partners, loungeLeads, login, logout, changePassword, refresh, setOrderStatus, setBookingStatus]);
+    orders, bookings, products, services, partners, loungeLeads, login, logout, changePassword, refresh, setOrderStatus, setBookingStatus, reviewProduct, reviewService, setPartnerStatus,
+  }), [ready, dataLoading, configMissing, authError, queryErrors, user, permissions, orders, bookings, products, services, partners, loungeLeads, login, logout, changePassword, refresh, setOrderStatus, setBookingStatus, reviewProduct, reviewService, setPartnerStatus]);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 

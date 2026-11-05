@@ -12,6 +12,7 @@ backend/src/generated/prisma/
 /ios
 
 # Local env and keys
+/admin-auth-tool/.env
 .env*.local
 *.jks
 *.p8

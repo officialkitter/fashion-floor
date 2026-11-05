@@ -8,6 +8,7 @@ export type Permission =
   | 'bookings.manage'
   | 'catalog.view'
   | 'catalog.manage'
+  | 'catalog.approve'
   | 'partners.view'
   | 'partners.manage'
   | 'team.view'
@@ -33,12 +34,12 @@ export const ROLE_META: Record<Role, RoleMeta> = {
 export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
   super_admin: [
     'dashboard.view', 'orders.view', 'orders.manage', 'bookings.view', 'bookings.manage',
-    'catalog.view', 'catalog.manage', 'partners.view', 'partners.manage', 'team.view',
+    'catalog.view', 'catalog.manage', 'catalog.approve', 'partners.view', 'partners.manage', 'team.view',
     'team.manage', 'roles.view', 'roles.edit', 'finance.view',
   ],
   admin: [
     'dashboard.view', 'orders.view', 'orders.manage', 'bookings.view', 'bookings.manage',
-    'catalog.view', 'catalog.manage', 'partners.view', 'partners.manage', 'team.view',
+    'catalog.view', 'catalog.manage', 'catalog.approve', 'partners.view', 'partners.manage', 'team.view',
     'team.manage', 'roles.view', 'finance.view',
   ],
   finance: ['dashboard.view', 'orders.view', 'bookings.view', 'finance.view', 'roles.view'],

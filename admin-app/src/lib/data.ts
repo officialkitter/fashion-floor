@@ -29,9 +29,36 @@ export interface Product {
   price: number;
   currency: string;
   stock: number;
+  stockTarget: number;
+  priceConfirmed: boolean;
+  brandPartnershipStatus: string;
+  brandApprovalStatus: 'pending' | 'published' | 'rejected';
+  storeApprovalStatus: 'pending' | 'published' | 'rejected';
+  partnerStatus: string;
   status: string;
   sizes: string[];
   images: string[];
+  approvalStatus: 'pending' | 'published' | 'rejected';
+  description: string;
+  createdAt: string;
+}
+
+export interface BusinessService {
+  id: string;
+  partnerId: string;
+  businessName: string;
+  category: string;
+  coverUrl: string;
+  name: string;
+  description: string;
+  price: number;
+  currency: string;
+  durationMinutes: number;
+  active: boolean;
+  approvalStatus: 'pending' | 'published' | 'rejected';
+  priceConfirmed: boolean;
+  businessApprovalStatus: 'pending' | 'published' | 'rejected';
+  partnerStatus: string;
 }
 
 export interface Customer {

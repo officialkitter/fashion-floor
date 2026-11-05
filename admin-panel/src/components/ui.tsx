@@ -101,6 +101,7 @@ const TONES: Record<string, { color: string; label?: string }> = {
   confirmed: { color: '#315B45', label: 'Confirmed' },
   verified: { color: '#315B45', label: 'Verified' },
   approved: { color: '#315B45', label: 'Approved' },
+  published: { color: '#315B45', label: 'Approved' },
   active: { color: '#315B45', label: 'Active' },
   available: { color: '#315B45', label: 'Available' },
   in_stock: { color: '#315B45', label: 'In stock' },

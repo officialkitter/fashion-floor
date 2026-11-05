@@ -14,3 +14,6 @@ enabled = true
 site_url = "http://localhost:8081"
 additional_redirect_urls = ["fashionfloor://"]
 enable_signup = true
+
+[functions.admin-invite-user]
+verify_jwt = true

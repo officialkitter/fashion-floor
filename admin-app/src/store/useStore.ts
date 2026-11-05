@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import type { Session } from '@supabase/supabase-js';
-import type { Booking, Member, Order, Partner, Product } from '../lib/data';
+import type { Booking, BusinessService, Member, Order, Partner, Product } from '../lib/data';
 import { fetchAdminData, profileFrom, roleFrom } from '../lib/backend';
 import type { Permission } from '../lib/rbac';
 import { ROLE_META, ROLE_PERMISSIONS } from '../lib/rbac';
@@ -23,6 +23,7 @@ interface State {
   orders: Order[];
   bookings: Booking[];
   products: Product[];
+  services: BusinessService[];
   partners: Partner[];
   toast: ToastMsg | null;
   start: () => () => void;
@@ -31,6 +32,8 @@ interface State {
   refresh: () => Promise<boolean>;
   setOrderStatus: (id: string, status: string) => Promise<boolean>;
   setBookingStatus: (id: string, status: string) => Promise<boolean>;
+  reviewProduct: (id: string, decision: 'published' | 'rejected') => Promise<boolean>;
+  reviewService: (id: string, decision: 'published' | 'rejected') => Promise<boolean>;
   notify: (text: string, tone?: ToastMsg['tone']) => void;
 }
 
@@ -51,6 +54,15 @@ async function callStatusRpc(functionName: 'update_order_status' | 'update_booki
   const args = functionName === 'update_order_status'
     ? { target_order_id: id, next_status: status }
     : { target_booking_id: id, next_status: status };
+  const { error } = await supabase.rpc(functionName, args);
+  return error;
+}
+
+async function callReviewRpc(functionName: 'review_product' | 'review_business_service', id: string, decision: 'published' | 'rejected') {
+  if (!supabase) return new Error('Supabase is not configured for live mode.');
+  const args = functionName === 'review_product'
+    ? { target_product_id: id, decision }
+    : { target_service_id: id, decision };
   const { error } = await supabase.rpc(functionName, args);
   return error;
 }
@@ -86,6 +98,7 @@ export const useStore = create<State>((set, get) => ({
   orders: [],
   bookings: [],
   products: [],
+  services: [],
   partners: [],
   toast: null,
 
@@ -98,7 +111,7 @@ export const useStore = create<State>((set, get) => ({
     if (authUnsubscribe) return authUnsubscribe;
     const handleSession = async (session: Session | null) => {
       if (!session) {
-        set({ userId: null, user: null, role: null, loading: false, refreshing: false, error: null, orders: [], bookings: [], products: [], partners: [] });
+        set({ userId: null, user: null, role: null, loading: false, refreshing: false, error: null, orders: [], bookings: [], products: [], services: [], partners: [] });
         if (channel) {
           await client.removeChannel(channel);
           channel = null;
@@ -115,6 +128,7 @@ export const useStore = create<State>((set, get) => ({
             .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => void get().refresh())
             .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings' }, () => void get().refresh())
             .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, () => void get().refresh())
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'business_services' }, () => void get().refresh())
             .on('postgres_changes', { event: '*', schema: 'public', table: 'vendors' }, () => void get().refresh())
             .subscribe();
         }
@@ -217,6 +231,38 @@ export const useStore = create<State>((set, get) => ({
       return refreshed;
     } catch (error) {
       get().notify(`Appointment update failed: ${errorText(error)}`, 'bad');
+      return false;
+    }
+  },
+
+  reviewProduct: async (id, decision) => {
+    try {
+      const error = await callReviewRpc('review_product', id, decision);
+      if (error) {
+        get().notify(`Product review failed: ${errorText(error)}`, 'bad');
+        return false;
+      }
+      const refreshed = await get().refresh();
+      if (refreshed) get().notify(decision === 'published' ? 'Product approved and published.' : 'Product declined.');
+      return refreshed;
+    } catch (error) {
+      get().notify(`Product review failed: ${errorText(error)}`, 'bad');
+      return false;
+    }
+  },
+
+  reviewService: async (id, decision) => {
+    try {
+      const error = await callReviewRpc('review_business_service', id, decision);
+      if (error) {
+        get().notify(`Service review failed: ${errorText(error)}`, 'bad');
+        return false;
+      }
+      const refreshed = await get().refresh();
+      if (refreshed) get().notify(decision === 'published' ? 'Service approved and published.' : 'Service declined.');
+      return refreshed;
+    } catch (error) {
+      get().notify(`Service review failed: ${errorText(error)}`, 'bad');
       return false;
     }
   },

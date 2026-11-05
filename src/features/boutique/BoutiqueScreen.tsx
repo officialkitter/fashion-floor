@@ -47,7 +47,6 @@ export function BoutiqueScreen({ searchTerm = '', swahili = false }: { searchTer
   const [open, setOpen] = useState(false);
   const [category, setCategory] = useState('All');
   const [selectedBrand, setSelectedBrand] = useState<string | null>(null);
-  const [showOffers, setShowOffers] = useState(false);
   const [selectedStore, setSelectedStore] = useState<string | null>(null);
   const hasProductFilters = category !== 'All' || selectedBrand !== null || searchTerm.trim().length > 0;
   const showEditorialSections = !hasProductFilters;
@@ -65,28 +64,34 @@ export function BoutiqueScreen({ searchTerm = '', swahili = false }: { searchTer
   const showError = status === 'error' && items.length === 0;
   const visibleItems = useMemo(() => {
     const query = searchTerm.trim().toLowerCase();
-    const categoryMatches: Record<string, string[]> = {
-      Men: ['p1', 'p3', 'p4', 'p5'],
-      Women: ['p2', 'p6', 'p7', 'p10', 'p11'],
-      Kids: ['p8'],
-      Jewelry: ['p9'],
+    const categoryMatches: Record<string, (item: Product) => boolean> = {
+      Men: (item) => /\b(men|men's|mens|unisex)\b/i.test(`${item.category ?? ''} ${item.title}`),
+      Women: (item) => /\b(women|women's|womens|ladies)\b/i.test(`${item.category ?? ''} ${item.title}`),
+      Kids: (item) => /\b(kids|children|child)\b/i.test(`${item.category ?? ''} ${item.title}`),
+      Jewelry: (item) => /\b(jewelry|jewellery|necklace|bracelet|earring|ring)\b/i.test(`${item.category ?? ''} ${item.title}`),
     };
-    return items.filter((item) =>
-      (!query || `${item.title} ${item.brand_tag.label} ${item.seller_name ?? ''} ${item.category ?? ''}`.toLowerCase().includes(query))
+    const filtered = items.filter((item) =>
+      (!query || `${item.title} ${item.brand_tag.label} ${item.seller_name ?? ''} ${item.category ?? ''} ${item.description ?? ''}`.toLowerCase().includes(query))
       && (!selectedBrand || (selectedBrand === 'other-brands'
         ? item.marketplace_category === 'other-brand'
         : item.brand_tag.label.toLowerCase().includes(selectedBrand)))
       && (category !== 'Other brands' || item.marketplace_category === 'other-brand')
-      && (!categoryMatches[category] || categoryMatches[category].includes(item.id)),
-    ).sort((a, b) => {
-      if (!a.catalog_key || a.catalog_key !== b.catalog_key) return 0;
-      return (b.seller_rating ?? 0) - (a.seller_rating ?? 0)
-        || (b.seller_review_count ?? 0) - (a.seller_review_count ?? 0)
-        || (b.units_sold ?? 0) - (a.units_sold ?? 0);
+      && (!categoryMatches[category] || categoryMatches[category](item)));
+    const groups = new Map<string, Product[]>();
+    filtered.forEach((item) => {
+      const key = item.catalog_key ? `catalog:${item.catalog_key}` : `product:${item.id}`;
+      const group = groups.get(key) ?? [];
+      group.push(item);
+      groups.set(key, group);
     });
+    return [...groups.values()].flatMap((group) => group.length < 2 ? group : group.sort((a, b) =>
+      (b.seller_rating ?? 0) - (a.seller_rating ?? 0)
+      || (b.seller_review_count ?? 0) - (a.seller_review_count ?? 0)
+      || (b.units_sold ?? 0) - (a.units_sold ?? 0),
+    ));
   }, [category, items, searchTerm, selectedBrand]);
   const brands = useMemo(() => {
-    const summaries = new Map<string, { id: string; label: string; rating: number; reviews: number; count: number }>();
+    const summaries = new Map<string, { id: string; label: string; rating: number; reviews: number; count: number; verified: boolean; local: boolean; image?: string }>();
     items.forEach((product) => {
       const current = summaries.get(product.brand_tag.id) ?? {
         id: product.brand_tag.id,
@@ -94,16 +99,39 @@ export function BoutiqueScreen({ searchTerm = '', swahili = false }: { searchTer
         rating: 0,
         reviews: 0,
         count: 0,
+        verified: product.brand_tag.partnership_status === 'verified',
+        local: Boolean(product.brand_tag.is_local),
+        image: product.images[0],
       };
       current.rating += product.rating ?? 0;
       current.reviews += product.review_count ?? 0;
       current.count += 1;
+      current.image ??= product.images[0];
       summaries.set(product.brand_tag.id, current);
     });
     return [...summaries.values()].sort((a, b) =>
       (b.rating / b.count) - (a.rating / a.count) || b.reviews - a.reviews,
     );
   }, [items]);
+  const brandSections = [
+    { title: 'Trending brands', brands: brands.slice(0, 6), filter: 'brands' },
+    { title: 'Popular verified brands', brands: brands.filter((brand) => brand.verified).slice(0, 6), filter: 'brands' },
+    { title: 'Our local brands', brands: brands.filter((brand) => brand.local).slice(0, 6), filter: 'brands' },
+    { title: 'Other brands', brands: brands.filter((brand) => items.some((product) => product.brand_tag.id === brand.id && product.marketplace_category === 'other-brand')).slice(0, 6), filter: 'other-brands' },
+  ].filter((section) => section.brands.length > 0);
+  const stores = useMemo(() => {
+    const summaries = new Map<string, { name: string; count: number; image?: string }>();
+    items.forEach((product) => {
+      const name = product.seller_name?.trim();
+      if (!name) return;
+      const summary = summaries.get(name) ?? { name, count: 0, image: product.images[0] };
+      summary.count += 1;
+      summary.image ??= product.images[0];
+      summaries.set(name, summary);
+    });
+    return [...summaries.values()];
+  }, [items]);
+  const selectedStoreProducts = items.filter((product) => product.seller_name === selectedStore);
 
   const header = (
     <Animated.View entering={FadeInDown.duration(650).springify()} style={styles.header}>
@@ -124,38 +152,34 @@ export function BoutiqueScreen({ searchTerm = '', swahili = false }: { searchTer
       </ScrollView>
       {showEditorialSections ? <LinearGradient colors={['#F2E6D8', '#E9D3C0']} style={styles.promo}>
         <View style={styles.promoCopy}>
-          <Text style={styles.promoKicker}>THE GOOD THINGS EDIT</Text>
-          <Text style={styles.promoTitle}>A little treat, on us.</Text>
-          <Text style={styles.promoDescription}>Discover this week's in-store offers and thoughtful finds.</Text>
-          <Pressable onPress={() => setShowOffers((shown) => !shown)} style={styles.promoButton}>
-            <Text style={styles.promoButtonText}>{showOffers ? 'Close offers  ↑' : 'Explore offers  →'}</Text>
+          <Text style={styles.promoKicker}>THE FASHION FLOOR EDIT</Text>
+          <Text style={styles.promoTitle}>Find your next favorite.</Text>
+          <Text style={styles.promoDescription}>Explore approved collections from the brands and stores on our floor.</Text>
+          <Pressable onPress={() => { setCategory('All'); setSelectedBrand(null); }} style={styles.promoButton}>
+            <Text style={styles.promoButtonText}>Explore the collection  →</Text>
           </Pressable>
         </View>
-        <View style={styles.promoRound}><Text style={styles.promoRoundText}>−20%</Text></View>
+        <View style={styles.promoRound}><Text style={styles.promoRoundText}>FF</Text></View>
       </LinearGradient> : null}
-      {showEditorialSections && showOffers ? (
-        <View style={styles.offerDetails}>
-          <Text style={styles.offerTitle}>This week on the floor</Text>
-          <Text style={styles.offerCopy}>Selected partner boutique pieces are up to 20% off. Offer availability is shown as a local preview.</Text>
-        </View>
-      ) : null}
       {showEditorialSections ? (
-        <>
+        <View>
+          {brandSections.map((section) => (
+            <View key={section.title}>
           <View style={styles.railHeading}>
-            <Text style={styles.sectionTitleSmall}>Brands to know</Text>
-            <Text style={styles.seeAll}>SEE ALL</Text>
+                  <Text style={styles.sectionTitleSmall}>{section.title}</Text>
+                  <Text style={styles.seeAll}>{section.brands.length} BRANDS</Text>
           </View>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.brandRail}>
-            {brands.map((brand, index) => (
-              <Pressable key={brand.id} onPress={() => { setCategory('Brands'); setSelectedBrand(brand.label.toLowerCase()); }} style={[styles.brandTile, index % 2 === 1 && styles.brandTileAlt]}>
-                <Text style={styles.brandWord}>{brand.label}</Text>
-              </Pressable>
-            ))}
-            <Pressable onPress={() => { setCategory('Brands'); setSelectedBrand('other-brands'); }} style={[styles.brandTile, styles.brandTileAlt]}>
-              <Text style={styles.brandWord}>Other brands</Text>
-            </Pressable>
+                    {section.brands.map((brand, index) => (
+                      <Pressable key={brand.id} onPress={() => { setCategory('Brands'); setSelectedBrand(section.filter === 'other-brands' ? 'other-brands' : brand.label.toLowerCase()); }} style={[styles.brandTile, index % 2 === 1 && styles.brandTileAlt]}>
+                        {brand.image ? <Image source={{ uri: brand.image }} style={StyleSheet.absoluteFill} contentFit="cover" cachePolicy="memory-disk" /> : null}
+                        <Text style={[styles.brandWord, brand.image && styles.brandWordOverlay]} numberOfLines={1}>{brand.label}</Text>
+                      </Pressable>
+                    ))}
           </ScrollView>
-        </>
+            </View>
+          ))}
+        </View>
       ) : null}
       {showEditorialSections && visibleItems.length > 0 ? <View style={styles.sectionRow}>
         <View>
@@ -246,42 +270,18 @@ export function BoutiqueScreen({ searchTerm = '', swahili = false }: { searchTer
             {showEditorialSections ? (
           <View style={styles.footer}>
             <View style={styles.footerHeading}>
-              <View><Text style={styles.sectionTitle}>Trending now</Text><Text style={styles.sub}>An edit worth a second look.</Text></View>
-              <Text style={styles.count}>SEE ALL  ↗</Text>
-            </View>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.trendingRail}>
-              {[
-                ['The everyday icon', 'A considered classic'],
-                ['Made to be noticed', 'A little evening magic'],
-              ].map(([title, subtitle], index) => (
-                <LinearGradient key={title} colors={index ? ['#D5B8A2', '#99745E'] : ['#D7D4CF', '#79756F']} style={styles.trendTile}>
-                  <Text style={styles.trendEyebrow}>THE FF EDIT · 0{index + 1}</Text>
-                  <Text style={styles.trendTitle}>{title}</Text>
-                  <Text style={styles.trendSubtitle}>{subtitle}</Text>
-                </LinearGradient>
-              ))}
-            </ScrollView>
-            <View style={styles.footerHeading}>
-              <View><Text style={styles.sectionTitle}>Recommended stores</Text><Text style={styles.sub}>Local boutiques, carefully chosen.</Text></View>
-              <Text style={styles.count}>SEE ALL  ↗</Text>
+              <View><Text style={styles.sectionTitle}>Stores on the floor</Text><Text style={styles.sub}>Stores with approved products in the shared catalog.</Text></View>
+              <Text style={styles.count}>{stores.length} STORES</Text>
             </View>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.storeRail}>
-              {[
-                ['The Wardrobe', 'Everyday, considered', 'photo-1490481651871-ab68de25d43d'],
-                ['Studio Kuro', 'Modern essentials', 'photo-1483985988355-763728e1935b'],
-                ['Maison Onyx', 'A little occasion', 'photo-1539109136881-3be0616acf4b'],
-              ].map(([name, subtitle, photo]) => (
-                <Pressable key={name} onPress={() => setSelectedStore(name)} style={styles.storeCard}>
-                  <Image source={{ uri: `https://images.unsplash.com/${photo}?auto=format&fit=crop&w=600&q=65` }} style={styles.storeImage} contentFit="cover" cachePolicy="memory-disk" />
-                  <Text style={styles.storeName}>{name}</Text>
-                  <Text style={styles.storeSubtitle}>{subtitle}  ·  ★ 4.9</Text>
+              {stores.filter((store) => store.image).map((store) => (
+                <Pressable key={store.name} onPress={() => setSelectedStore(store.name)} style={styles.storeCard}>
+                  <Image source={{ uri: store.image }} style={styles.storeImage} contentFit="cover" cachePolicy="memory-disk" />
+                  <Text style={styles.storeName}>{store.name}</Text>
+                  <Text style={styles.storeSubtitle}>{store.count} {store.count === 1 ? 'product' : 'products'} shown</Text>
                 </Pressable>
               ))}
             </ScrollView>
-            <View style={styles.storeNote}>
-              <Text style={styles.storeNoteTitle}>Great style, from great stores.</Text>
-              <Text style={styles.storeNoteCopy}>Meet the independent Tanzanian boutiques behind every find.</Text>
-            </View>
           </View>
             ) : null}
           </>
@@ -292,10 +292,10 @@ export function BoutiqueScreen({ searchTerm = '', swahili = false }: { searchTer
         <View style={styles.storeSheet}>
           <Text style={styles.kicker}>FASHION FLOOR PARTNER</Text>
           <Text style={styles.storeSheetTitle}>{selectedStore}</Text>
-          <Text style={styles.storeSheetCopy}>A locally curated boutique bringing thoughtful style to Dar es Salaam. Explore new arrivals, store favorites and a personal edit from this partner.</Text>
+          <Text style={styles.storeSheetCopy}>Browse published pieces from this store in the Fashion Floor catalog.</Text>
           <View style={styles.storeFacts}>
-            <Text style={styles.storeFact}>★ 4.9  ·  120+ reviews</Text>
-            <Text style={styles.storeFact}>Dar es Salaam  ·  Same-city delivery</Text>
+            <Text style={styles.storeFact}>{selectedStoreProducts.length} approved products currently loaded</Text>
+            <Text style={styles.storeFact}>Product availability and pricing are shown from the shared catalog.</Text>
           </View>
           <PrimaryButton label="Browse this store" onPress={() => { setCategory('Stores'); setSelectedBrand(null); setSelectedStore(null); }} />
         </View>
@@ -506,9 +506,10 @@ const styles = StyleSheet.create({
   railHeading: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: space.xl, marginBottom: space.sm },
   seeAll: { ...type.label, color: colors.terracotta, fontSize: 8 },
   brandRail: { gap: space.sm, paddingRight: space.xl },
-  brandTile: { width: 90, height: 56, borderRadius: radius.md, backgroundColor: colors.offWhite, alignItems: 'center', justifyContent: 'center' },
+  brandTile: { width: 112, height: 72, borderRadius: radius.md, backgroundColor: colors.offWhite, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   brandTileAlt: { backgroundColor: '#F5F0EA' },
-  brandWord: { color: colors.black, fontSize: 13, fontWeight: '800', letterSpacing: 1 },
+  brandWord: { maxWidth: '90%', color: colors.black, fontSize: 13, fontWeight: '800', letterSpacing: 1 },
+  brandWordOverlay: { color: colors.white, textShadowColor: 'rgba(0,0,0,0.8)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4, backgroundColor: 'rgba(30,20,15,0.38)', paddingHorizontal: 5, paddingVertical: 3, borderRadius: 5 },
   footer: { paddingBottom: space.xxl },
   footerHeading: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: space.md },
   trendingRail: { gap: space.md, paddingRight: space.xl },

@@ -14,7 +14,7 @@ const NAV: { href: string; label: string; icon: LucideIcon; perm: Permission }[]
   { href: '/dashboard', label: 'Overview', icon: LayoutDashboard, perm: 'dashboard.view' },
   { href: '/orders', label: 'Orders', icon: ShoppingBag, perm: 'orders.view' },
   { href: '/bookings', label: 'Appointments', icon: CalendarDays, perm: 'bookings.view' },
-  { href: '/catalog', label: 'Boutique catalog', icon: Package, perm: 'catalog.view' },
+  { href: '/catalog', label: 'Products & approvals', icon: Package, perm: 'catalog.view' },
   { href: '/partners', label: 'Suppliers & providers', icon: Store, perm: 'partners.view' },
   { href: '/settings', label: 'Account settings', icon: Settings, perm: 'dashboard.view' },
   { href: '/team', label: 'Team', icon: Users, perm: 'team.view' },
