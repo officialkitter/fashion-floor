@@ -14,6 +14,8 @@
     "admin-app:start": "npm --prefix admin-app run start"
   },
   "dependencies": {
+    "@supabase/server": "^1.9.2",
+    "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.118.0",
     "expo": "~52.0.0",
     "expo-asset": "~11.0.5",
@@ -37,6 +39,7 @@
   "devDependencies": {
     "@babel/core": "^7.25.0",
     "@types/react": "~18.3.12",
+    "supabase": "^3.0.0",
     "typescript": "^5.3.3"
   },
   "private": true

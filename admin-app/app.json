@@ -6,12 +6,31 @@
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
-    "splash": { "backgroundColor": "#30231D", "resizeMode": "contain" },
-    "ios": { "supportsTablet": true, "bundleIdentifier": "com.fashionfloor.admin" },
+    "splash": {
+      "backgroundColor": "#30231D",
+      "resizeMode": "contain"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.fashionfloor.admin"
+    },
     "android": {
       "package": "com.fashionfloor.admin",
-      "adaptiveIcon": { "backgroundColor": "#30231D" }
+      "adaptiveIcon": {
+        "backgroundColor": "#30231D"
+      }
     },
-    "plugins": ["expo-splash-screen"]
+    "plugins": [
+      "expo-splash-screen",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "kotlinVersion": "1.9.25"
+          }
+        }
+      ],
+      "./plugins/withAndroidSplashDrawable"
+    ]
   }
 }

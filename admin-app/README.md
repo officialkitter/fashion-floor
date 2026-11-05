@@ -19,3 +19,7 @@ The app requires `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_PUBLISHABL
 The app reads the signed-in user's `profiles` and `user_roles` rows, then loads `admin_orders`, `admin_bookings`, `admin_products`, and `admin_partners`. Order and booking status changes call the `update_order_status` and `update_booking_status` RPCs. Reload records with pull-to-refresh; changes to the underlying orders, bookings, products, or partners tables trigger a refresh when realtime is available.
 
 Screens are hidden according to the user's role. Row access and mutations must still be authorized by Supabase RLS and the database RPCs.
+
+## Android build
+
+The Android prebuild configuration pins Kotlin to 1.9.25 to match Expo Modules Core's Compose compiler and copies the Fashion Floor vector mark into the generated splash resources. After changing Expo config plugins or resetting the generated Android project, run `npx expo prebuild --platform android --no-install` before building with `npm run android`.

@@ -31,6 +31,7 @@ export function LoungeScreen({ searchTerm = '', swahili = false }: { searchTerm?
   const buildingStatus = useBuildingStore((s) => s.status);
   const buildingError = useBuildingStore((s) => s.error);
   const loadBuildings = useBuildingStore((s) => s.load);
+  const loadMoreBuildings = useBuildingStore((s) => s.loadMore);
   const [service, setService] = useState('All');
   const [selectedBuilding, setSelectedBuilding] = useState<FashionBuilding | null>(null);
 
@@ -150,6 +151,16 @@ export function LoungeScreen({ searchTerm = '', swahili = false }: { searchTerm?
         updateCellsBatchingPeriod={40}
         windowSize={5}
         removeClippedSubviews
+        onEndReached={() => { void loadMoreBuildings(); }}
+        onEndReachedThreshold={0.5}
+        ListFooterComponent={status === 'error' && items.length > 0 ? (
+          <View style={styles.pad}>
+            <Text style={styles.error}>{error ?? 'Could not load more providers.'}</Text>
+            <Pressable onPress={() => load({ force: true })} style={styles.retry}>
+              <Text style={styles.retryText}>Try again</Text>
+            </Pressable>
+          </View>
+        ) : null}
         renderItem={({ item, index }) => (
           <Animated.View entering={FadeInUp.delay(Math.min(index, 5) * 35).duration(260)}>
             <BuildingCard building={item} onPress={() => setSelectedBuilding(item)} />

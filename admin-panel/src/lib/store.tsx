@@ -2,7 +2,7 @@
 
 import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import type { AuthChangeEvent, Session } from '@supabase/supabase-js';
-import type { Booking, BookingStatus, Order, OrderStatus, Partner, Product, AdminUser } from './data';
+import type { Booking, BookingStatus, LoungeDirectoryLead, Order, OrderStatus, Partner, Product, AdminUser } from './data';
 import { getSupabase, hasSupabaseConfig } from './supabase';
 import type { Permission, Role } from './rbac';
 
@@ -12,7 +12,7 @@ const PERMISSIONS: Permission[] = [
   'team.manage', 'roles.view', 'roles.edit', 'finance.view',
 ];
 
-type QueryKey = 'orders' | 'bookings' | 'products' | 'partners';
+type QueryKey = 'orders' | 'bookings' | 'products' | 'partners' | 'loungeLeads';
 interface StoreValue {
   ready: boolean;
   dataLoading: boolean;
@@ -26,8 +26,10 @@ interface StoreValue {
   bookings: Booking[];
   products: Product[];
   partners: Partner[];
+  loungeLeads: LoungeDirectoryLead[];
   login: (email: string, password: string) => Promise<{ ok: boolean; reason?: string }>;
   logout: () => Promise<void>;
+  changePassword: (password: string) => Promise<void>;
   refresh: () => Promise<void>;
   setOrderStatus: (id: string, status: OrderStatus) => Promise<void>;
   setBookingStatus: (id: string, status: BookingStatus) => Promise<void>;
@@ -110,6 +112,24 @@ function mapPartner(row: any): Partner {
   };
 }
 
+function mapLoungeLead(row: any): LoungeDirectoryLead {
+  return {
+    id: row.id,
+    referenceCode: row.reference_code,
+    category: row.category,
+    country: row.country,
+    city: row.city,
+    area: row.area,
+    businessName: row.business_name,
+    sourceName: row.source_name,
+    sourceUrl: row.source_url,
+    publishedPriceEvidence: row.published_price_evidence,
+    status: row.status,
+    linkedBusinessId: row.linked_business_id,
+    createdAt: row.created_at,
+  };
+}
+
 export function StoreProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
   const [dataLoading, setDataLoading] = useState(false);
@@ -122,6 +142,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [partners, setPartners] = useState<Partner[]>([]);
+  const [loungeLeads, setLoungeLeads] = useState<LoungeDirectoryLead[]>([]);
 
   const clearData = useCallback(() => {
     setUser(null);
@@ -130,6 +151,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setBookings([]);
     setProducts([]);
     setPartners([]);
+    setLoungeLeads([]);
     setQueryErrors({});
     setDataLoading(false);
   }, []);
@@ -202,20 +224,23 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     if (!supabase || !user) return;
     setDataLoading(true);
     const errors: Partial<Record<QueryKey, string>> = {};
-    const [orderResult, bookingResult, productResult, partnerResult] = await Promise.all([
+    const [orderResult, bookingResult, productResult, partnerResult, loungeLeadResult] = await Promise.all([
       permissions.includes('orders.view') ? supabase.from('admin_orders').select('*').order('created_at', { ascending: false }) : Promise.resolve({ data: [], error: null }),
       permissions.includes('bookings.view') ? supabase.from('admin_bookings').select('*').order('starts_at', { ascending: true }) : Promise.resolve({ data: [], error: null }),
       permissions.includes('catalog.view') ? supabase.from('admin_products').select('*').order('title', { ascending: true }) : Promise.resolve({ data: [], error: null }),
       permissions.includes('partners.view') ? supabase.from('admin_partners').select('*').order('created_at', { ascending: false }) : Promise.resolve({ data: [], error: null }),
+      permissions.includes('partners.view') ? supabase.from('lounge_directory_leads').select('*').order('reference_code', { ascending: true }) : Promise.resolve({ data: [], error: null }),
     ]);
     if (orderResult.error) errors.orders = errorText(orderResult.error);
     if (bookingResult.error) errors.bookings = errorText(bookingResult.error);
     if (productResult.error) errors.products = errorText(productResult.error);
     if (partnerResult.error) errors.partners = errorText(partnerResult.error);
+    if (loungeLeadResult.error) errors.loungeLeads = errorText(loungeLeadResult.error);
     setOrders(((orderResult.data ?? []) as any[]).map(mapOrder));
     setBookings(((bookingResult.data ?? []) as any[]).map(mapBooking));
     setProducts(((productResult.data ?? []) as any[]).map(mapProduct));
     setPartners(((partnerResult.data ?? []) as any[]).map(mapPartner));
+    setLoungeLeads(((loungeLeadResult.data ?? []) as any[]).map(mapLoungeLead));
     setQueryErrors(errors);
     setDataLoading(false);
   }, [user, permissions]);
@@ -280,6 +305,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setAuthError(null);
   }, [clearData]);
 
+  const changePassword = useCallback(async (password: string) => {
+    const supabase = getSupabase();
+    if (!supabase) throw new Error('Supabase is not configured.');
+    const { error } = await supabase.auth.updateUser({ password });
+    if (error) throw new Error(error.message);
+  }, []);
+
   const setOrderStatus = useCallback(async (id: string, status: OrderStatus) => {
     const supabase = getSupabase();
     if (!supabase) throw new Error('Supabase is not configured.');
@@ -299,8 +331,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<StoreValue>(() => ({
     ready, dataLoading, configMissing, authError, queryErrors, user, role: user?.role ?? null, permissions,
-    orders, bookings, products, partners, login, logout, refresh, setOrderStatus, setBookingStatus,
-  }), [ready, dataLoading, configMissing, authError, queryErrors, user, permissions, orders, bookings, products, partners, login, logout, refresh, setOrderStatus, setBookingStatus]);
+    orders, bookings, products, partners, loungeLeads, login, logout, changePassword, refresh, setOrderStatus, setBookingStatus,
+  }), [ready, dataLoading, configMissing, authError, queryErrors, user, permissions, orders, bookings, products, partners, loungeLeads, login, logout, changePassword, refresh, setOrderStatus, setBookingStatus]);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 

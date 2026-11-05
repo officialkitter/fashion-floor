@@ -40,6 +40,7 @@ export function BoutiqueScreen({ searchTerm = '', swahili = false }: { searchTer
   const status = useBoutiqueStore((s) => s.status);
   const error = useBoutiqueStore((s) => s.error);
   const load = useBoutiqueStore((s) => s.load);
+  const loadMore = useBoutiqueStore((s) => s.loadMore);
 
   // `selected` outlives `open` so the product stays rendered during the close animation.
   const [selected, setSelected] = useState<Product | null>(null);
@@ -221,6 +222,8 @@ export function BoutiqueScreen({ searchTerm = '', swahili = false }: { searchTer
         updateCellsBatchingPeriod={40}
         windowSize={5}
         removeClippedSubviews
+        onEndReached={() => { void loadMore(); }}
+        onEndReachedThreshold={0.5}
         renderItem={({ item, index }) => (
           <Animated.View entering={FadeInUp.delay(Math.min(index, 5) * 35).duration(260)} style={{ width: cardWidth }}>
             <ProductCard product={item} width={cardWidth} onPress={onSelect} />
@@ -233,7 +236,14 @@ export function BoutiqueScreen({ searchTerm = '', swahili = false }: { searchTer
           </View>
         )}
         ListFooterComponent={
-          showEditorialSections ? (
+          <>
+            {status === 'error' && items.length > 0 ? (
+              <View style={styles.emptyState}>
+                <Text style={styles.sub}>{error ?? 'Could not load more pieces.'}</Text>
+                <PrimaryButton label="Try again" onPress={() => load({ force: true })} />
+              </View>
+            ) : null}
+            {showEditorialSections ? (
           <View style={styles.footer}>
             <View style={styles.footerHeading}>
               <View><Text style={styles.sectionTitle}>Trending now</Text><Text style={styles.sub}>An edit worth a second look.</Text></View>
@@ -262,7 +272,7 @@ export function BoutiqueScreen({ searchTerm = '', swahili = false }: { searchTer
                 ['Maison Onyx', 'A little occasion', 'photo-1539109136881-3be0616acf4b'],
               ].map(([name, subtitle, photo]) => (
                 <Pressable key={name} onPress={() => setSelectedStore(name)} style={styles.storeCard}>
-                  <Image source={{ uri: `https://images.unsplash.com/${photo}?w=700` }} style={styles.storeImage} contentFit="cover" />
+                  <Image source={{ uri: `https://images.unsplash.com/${photo}?auto=format&fit=crop&w=600&q=65` }} style={styles.storeImage} contentFit="cover" cachePolicy="memory-disk" />
                   <Text style={styles.storeName}>{name}</Text>
                   <Text style={styles.storeSubtitle}>{subtitle}  ·  ★ 4.9</Text>
                 </Pressable>
@@ -273,7 +283,8 @@ export function BoutiqueScreen({ searchTerm = '', swahili = false }: { searchTer
               <Text style={styles.storeNoteCopy}>Meet the independent Tanzanian boutiques behind every find.</Text>
             </View>
           </View>
-          ) : null
+            ) : null}
+          </>
         }
       />
       <SizeSheet product={selected} visible={open} onClose={() => setOpen(false)} />

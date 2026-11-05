@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { StyleSheet } from 'react-native';
 import Animated, { SlideInDown, SlideOutDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -16,7 +16,11 @@ interface Props {
 /** Shows the cart total for the active department only. */
 export function CartBar({ onPress, bottomOffset = 12, lounge = false }: Props) {
   const insets = useSafeAreaInsets();
-  const items = useCartStore((state) => state.items.filter((item) => lounge ? item.kind === 'salon' : item.kind === 'product'));
+  const cartItems = useCartStore((state) => state.items);
+  const items = useMemo(
+    () => cartItems.filter((item) => lounge ? item.kind === 'salon' : item.kind === 'product'),
+    [cartItems, lounge],
+  );
   const count = items.reduce((total, item) => total + item.quantity, 0);
   const subtotal = items.reduce((total, item) => total + item.unit_price_minor * item.quantity, 0);
   const currency = items[0]?.currency ?? 'TZS';

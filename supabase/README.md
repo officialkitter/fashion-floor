@@ -1,6 +1,6 @@
 # Supabase backend
 
-The initial migration creates the Fashion Floor catalog, brand/store directory, Lounge businesses, providers, reviews, and appointment booking schema. Row-level security is enabled throughout. The migration contains no sample merchants, products, reviews, or appointments.
+The initial migration creates the Fashion Floor catalog, brand/store directory, Lounge businesses, providers, reviews, and appointment booking schema. Row-level security is enabled throughout. The Lounge directory intake migration adds 110 private sourcing placeholders across 11 categories; it does not invent business identities, locations, public listings, prices, reviews, or appointments.
 
 ## Local setup
 

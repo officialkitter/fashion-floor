@@ -77,3 +77,19 @@ export interface Partner {
   active: boolean;
   createdAt: string;
 }
+
+export interface LoungeDirectoryLead {
+  id: string;
+  referenceCode: string;
+  category: string;
+  country: string;
+  city: string | null;
+  area: string | null;
+  businessName: string | null;
+  sourceName: string | null;
+  sourceUrl: string | null;
+  publishedPriceEvidence: string | null;
+  status: 'awaiting_source' | 'contacted' | 'verified' | 'rejected';
+  linkedBusinessId: string | null;
+  createdAt: string;
+}

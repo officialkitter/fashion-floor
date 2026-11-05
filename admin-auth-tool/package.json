@@ -1,0 +1,10 @@
+{
+  "name": "admin-auth-tool",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "update-passwords.js",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.0.0",
+    "dotenv": "^16.0.0"
+  }
+}

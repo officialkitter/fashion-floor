@@ -105,6 +105,8 @@ const TONES: Record<string, { color: string; label?: string }> = {
   available: { color: '#315B45', label: 'Available' },
   in_stock: { color: '#315B45', label: 'In stock' },
   pending: { color: '#B87932', label: 'Pending' },
+  awaiting_source: { color: '#B87932', label: 'Awaiting source' },
+  contacted: { color: '#B87932', label: 'Contacted' },
   processing: { color: '#B87932', label: 'Processing' },
   invited: { color: '#B87932', label: 'Invited' },
   low_stock: { color: '#B87932', label: 'Low stock' },

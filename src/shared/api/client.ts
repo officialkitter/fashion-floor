@@ -4,6 +4,7 @@ import { mockRoute } from './mocks';
 import type { FashionBuilding, Product, Stylist } from '../types/domain';
 
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL;
+export const RESOURCE_PAGE_SIZE = 40;
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL;
 const SUPABASE_PUBLISHABLE_KEY =
   process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
@@ -38,7 +39,7 @@ export class ApiError extends Error {
   }
 }
 
-async function getFromSupabase<T>(path: string): Promise<T> {
+async function getFromSupabase<T>(path: string, offset: number): Promise<T> {
   if (!supabase) {
     throw new ApiError(
       503,
@@ -51,11 +52,22 @@ async function getFromSupabase<T>(path: string): Promise<T> {
       .order('seller_rating', { ascending: false })
       .order('seller_review_count', { ascending: false })
       .order('units_sold', { ascending: false })
+      .order('id', { ascending: true })
+      .range(offset, offset + RESOURCE_PAGE_SIZE - 1)
       .returns<Product[]>()
     : path === '/v1/lounge/stylists'
-      ? await supabase.from('lounge_stylists').select('*').returns<Stylist[]>()
+      ? await supabase.from('lounge_stylists').select('*')
+        .order('rating', { ascending: false })
+        .order('id', { ascending: true })
+        .range(offset, offset + RESOURCE_PAGE_SIZE - 1)
+        .returns<Stylist[]>()
       : path === '/v1/lounge/buildings'
-        ? await supabase.from('fashion_buildings').select('*').returns<FashionBuilding[]>()
+        ? await supabase.from('fashion_buildings').select('*')
+          .order('rating', { ascending: false })
+          .order('review_count', { ascending: false })
+          .order('id', { ascending: true })
+          .range(offset, offset + RESOURCE_PAGE_SIZE - 1)
+          .returns<FashionBuilding[]>()
         : null;
 
   if (!result) throw new ApiError(404, `No Supabase resource is mapped for ${path}.`);
@@ -63,9 +75,12 @@ async function getFromSupabase<T>(path: string): Promise<T> {
   return result.data as T;
 }
 
-async function request<T>(path: string, timeoutMs = 10_000): Promise<T> {
-  if (USE_MOCKS) return mockRoute<T>(path);
-  if (supabase) return getFromSupabase<T>(path);
+async function request<T>(path: string, offset = 0, timeoutMs = 10_000): Promise<T> {
+  if (USE_MOCKS) {
+    const data = await mockRoute<T[]>(path);
+    return data.slice(offset, offset + RESOURCE_PAGE_SIZE) as T;
+  }
+  if (supabase) return getFromSupabase<T>(path, offset);
   if (!BASE_URL) {
     throw new ApiError(
       503,
@@ -76,10 +91,14 @@ async function request<T>(path: string, timeoutMs = 10_000): Promise<T> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const res = await fetch(`${BASE_URL}${path}`, {
+    const separator = `${BASE_URL}${path}`.includes('?') ? '&' : '?';
+    const res = await fetch(
+      `${BASE_URL}${path}${separator}offset=${offset}&limit=${RESOURCE_PAGE_SIZE}`,
+      {
       headers: { Accept: 'application/json' },
       signal: controller.signal,
-    });
+      },
+    );
     if (!res.ok) throw new ApiError(res.status, `Request failed (${res.status})`);
     return (await res.json()) as T;
   } catch (error) {
@@ -91,7 +110,7 @@ async function request<T>(path: string, timeoutMs = 10_000): Promise<T> {
 }
 
 export const api = {
-  get: <T>(path: string) => request<T>(path),
+  get: <T>(path: string, offset = 0) => request<T>(path, offset),
 };
 
 export interface CustomerOrder {

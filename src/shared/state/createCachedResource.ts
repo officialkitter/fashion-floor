@@ -1,15 +1,17 @@
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
-import { api } from '../api/client';
+import { api, RESOURCE_PAGE_SIZE } from '../api/client';
 import { mmkvStorage } from '../storage/mmkv';
 
 export interface ResourceState<T> {
   items: T[];
+  hasMore: boolean;
   /** `loading` = nothing cached yet (show skeletons); `refreshing` = stale-while-revalidate. */
   status: 'idle' | 'loading' | 'refreshing' | 'error';
   error?: string;
   fetchedAt: number | null;
   load: (opts?: { force?: boolean }) => Promise<void>;
+  loadMore: () => Promise<void>;
 }
 
 /**
@@ -21,6 +23,7 @@ export function createCachedResource<T>(name: string, path: string, ttlMs = 5 * 
     persist(
       (set, get) => ({
         items: [],
+        hasMore: true,
         status: 'idle',
         error: undefined,
         fetchedAt: null,
@@ -32,17 +35,43 @@ export function createCachedResource<T>(name: string, path: string, ttlMs = 5 * 
 
           set({ status: items.length ? 'refreshing' : 'loading', error: undefined });
           try {
-            const data = await api.get<T[]>(path);
-            set({ items: data, status: 'idle', fetchedAt: Date.now() });
+            const data = await api.get<T[]>(path, 0);
+            set({
+              items: data,
+              hasMore: data.length === RESOURCE_PAGE_SIZE,
+              status: 'idle',
+              fetchedAt: Date.now(),
+            });
           } catch (e) {
             set({ status: 'error', error: e instanceof Error ? e.message : 'Something went wrong' });
+          }
+        },
+        loadMore: async () => {
+          const { items, hasMore, status } = get();
+          if (!hasMore || status === 'loading' || status === 'refreshing' || status === 'error') return;
+          if (!items.length) return get().load();
+
+          set({ status: 'refreshing', error: undefined });
+          try {
+            const data = await api.get<T[]>(path, items.length);
+            set((state) => ({
+              items: [...state.items, ...data],
+              hasMore: data.length === RESOURCE_PAGE_SIZE,
+              status: 'idle',
+              fetchedAt: Date.now(),
+            }));
+          } catch (e) {
+            set({
+              status: 'error',
+              error: e instanceof Error ? e.message : 'Something went wrong',
+            });
           }
         },
       }),
       {
         name,
         storage: createJSONStorage(() => mmkvStorage),
-        partialize: (s) => ({ items: s.items, fetchedAt: s.fetchedAt }),
+        partialize: (s) => ({ items: s.items, hasMore: s.hasMore, fetchedAt: s.fetchedAt }),
       },
     ),
   );
