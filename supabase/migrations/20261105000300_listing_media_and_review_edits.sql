@@ -1,6 +1,62 @@
 alter table public.businesses
   add column source_url text;
 
+create or replace function public.has_permission(permission_key text)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select exists (
+    select 1
+    from public.user_roles role_row
+    where role_row.user_id = (select auth.uid())
+      and role_row.is_active
+      and (
+        role_row.role not in ('supplier', 'provider')
+        or exists (
+          select 1 from public.vendors vendor
+          where vendor.id = role_row.vendor_id and vendor.is_active
+        )
+      )
+      and case
+        when role_row.access_role_id is not null then exists (
+          select 1
+          from public.access_roles assigned_role
+          join public.departments department on department.id = assigned_role.department_id
+          where assigned_role.id = role_row.access_role_id
+            and assigned_role.is_active
+            and department.is_active
+            and permission_key = any(assigned_role.permissions)
+        )
+        when role_row.role = 'super_admin' then true
+        when role_row.role = 'admin' then permission_key in (
+          'dashboard.view', 'orders.view', 'orders.manage', 'bookings.view',
+          'bookings.manage', 'catalog.view', 'catalog.manage', 'catalog.approve',
+          'partners.view', 'partners.manage', 'team.view', 'team.manage',
+          'roles.view', 'roles.edit', 'finance.view'
+        )
+        when role_row.role = 'finance' then permission_key in (
+          'dashboard.view', 'orders.view', 'bookings.view', 'finance.view', 'roles.view'
+        )
+        when role_row.role = 'support' then permission_key in (
+          'dashboard.view', 'orders.view', 'orders.manage', 'bookings.view',
+          'bookings.manage', 'catalog.view'
+        )
+        when role_row.role = 'supplier' then permission_key in (
+          'dashboard.view', 'orders.view', 'orders.manage', 'catalog.view',
+          'catalog.manage', 'partners.view', 'finance.view'
+        )
+        when role_row.role = 'provider' then permission_key in (
+          'dashboard.view', 'bookings.view', 'bookings.manage', 'catalog.view',
+          'catalog.manage', 'partners.view', 'finance.view'
+        )
+        else false
+      end
+  );
+$$;
+
 create or replace function public.queue_business_review()
 returns trigger
 language plpgsql
@@ -317,8 +373,8 @@ declare
   linked_vendor_id uuid;
 begin
   if not public.has_permission('partners.manage')
-    or not public.has_role(array['super_admin', 'admin']::public.platform_role[]) then
-    raise exception 'Only platform administrators can edit provider and store records.' using errcode = '42501';
+    and not public.has_permission('catalog.manage') then
+    raise exception 'You do not have permission to edit provider and store records.' using errcode = '42501';
   end if;
   if pg_catalog.btrim(coalesce(listing_name, '')) = ''
     or pg_catalog.btrim(coalesce(listing_city, '')) = ''

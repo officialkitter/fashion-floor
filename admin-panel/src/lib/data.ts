@@ -70,6 +70,16 @@ export interface Product {
   partnerStatus: string;
   sizes: { size: string; stock: number }[];
   images: string[];
+  colors: string[];
+  originalPrice: number | null;
+  material: string;
+  fit: string;
+  care: string;
+  origin: string;
+  shipping: string;
+  returns: string;
+  authenticity: string;
+  season: string;
   active: boolean;
   approvalStatus: 'pending' | 'published' | 'rejected';
   description: string;
@@ -82,6 +92,7 @@ export interface BusinessService {
   businessName: string;
   category: string;
   coverUrl: string;
+  sourceUrl: string;
   name: string;
   description: string;
   price: number;

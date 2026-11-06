@@ -36,7 +36,52 @@ interface StoreValue {
   setBookingStatus: (id: string, status: BookingStatus) => Promise<void>;
   reviewProduct: (id: string, decision: 'published' | 'rejected') => Promise<void>;
   reviewService: (id: string, decision: 'published' | 'rejected') => Promise<void>;
+  saveProduct: (product: Product, changes: ProductChanges) => Promise<void>;
+  saveService: (service: BusinessService, changes: ServiceChanges) => Promise<void>;
+  savePartnerListing: (kind: 'store' | 'provider', id: string, changes: PartnerListingChanges) => Promise<void>;
   setPartnerStatus: (id: string, status: 'approved' | 'rejected') => Promise<void>;
+}
+
+export interface ProductChanges {
+  title: string;
+  description: string;
+  category: string;
+  priceMinor: number;
+  originalPriceMinor: number | null;
+  currency: string;
+  images: string[];
+  sizes: { size: string; stock: number }[];
+  colors: string[];
+  material: string;
+  fit: string;
+  care: string;
+  origin: string;
+  shipping: string;
+  returns: string;
+  authenticity: string;
+  season: string;
+  confirmPrice: boolean;
+}
+
+export interface ServiceChanges {
+  name: string;
+  description: string;
+  priceMinor: number;
+  currency: string;
+  durationMinutes: number;
+  confirmPrice: boolean;
+}
+
+export interface PartnerListingChanges {
+  name: string;
+  category: string;
+  city: string;
+  area: string;
+  country: string;
+  address: string;
+  description: string;
+  imageUrl: string;
+  sourceUrl: string;
 }
 
 const Ctx = createContext<StoreValue | null>(null);
@@ -105,6 +150,16 @@ function mapProduct(row: any): Product {
     partnerStatus: row.partner_status ?? 'pending',
     sizes,
     images: row.images ?? [],
+    colors: row.colors ?? [],
+    originalPrice: row.original_price_minor == null ? null : Number(row.original_price_minor) / 100,
+    material: row.material ?? '',
+    fit: row.fit ?? '',
+    care: row.care ?? '',
+    origin: row.origin ?? '',
+    shipping: row.shipping ?? '',
+    returns: row.returns ?? '',
+    authenticity: row.authenticity ?? '',
+    season: row.season ?? '',
     active: Boolean(row.is_active),
     approvalStatus: row.approval_status,
     description: row.description ?? '',
@@ -119,6 +174,7 @@ function mapService(row: any): BusinessService {
     businessName: row.business_name ?? '',
     category: row.business_category ?? '',
     coverUrl: row.cover_url ?? '',
+    sourceUrl: row.source_url ?? '',
     name: row.name,
     description: row.description ?? '',
     price: Number(row.price_minor) / 100,
@@ -402,10 +458,78 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     await refresh();
   }, [refresh]);
 
+  const saveProduct = useCallback(async (product: Product, changes: ProductChanges) => {
+    const supabase = getSupabase();
+    if (!supabase) throw new Error('Supabase is not configured.');
+    const { error } = await supabase.rpc('save_product_listing', {
+      target_product_id: product.id,
+      product_title: changes.title,
+      product_description: changes.description,
+      product_category: changes.category,
+      product_price_minor: changes.priceMinor,
+      product_original_price_minor: changes.originalPriceMinor,
+      product_currency: changes.currency,
+      product_images: changes.images,
+      product_sizes: changes.sizes,
+      product_colors: changes.colors,
+      product_material: changes.material,
+      product_fit: changes.fit,
+      product_care: changes.care,
+      product_origin: changes.origin,
+      product_shipping: changes.shipping,
+      product_returns: changes.returns,
+      product_authenticity: changes.authenticity,
+      product_season: changes.season,
+      confirm_price: changes.confirmPrice,
+    });
+    if (error) throw new Error(error.message);
+    await refresh();
+  }, [refresh]);
+
+  const saveService = useCallback(async (service: BusinessService, changes: ServiceChanges) => {
+    const supabase = getSupabase();
+    if (!supabase) throw new Error('Supabase is not configured.');
+    const { error } = await supabase.rpc('save_business_service', {
+      target_service_id: service.id,
+      service_name: changes.name,
+      service_description: changes.description,
+      service_price_minor: changes.priceMinor,
+      service_currency: changes.currency,
+      service_duration_min: changes.durationMinutes,
+      confirm_price: changes.confirmPrice,
+    });
+    if (error) throw new Error(error.message);
+    await refresh();
+  }, [refresh]);
+
+  const savePartnerListing = useCallback(async (
+    kind: 'store' | 'provider',
+    id: string,
+    changes: PartnerListingChanges,
+  ) => {
+    const supabase = getSupabase();
+    if (!supabase) throw new Error('Supabase is not configured.');
+    const { error } = await supabase.rpc('save_partner_listing', {
+      target_kind: kind,
+      target_id: id,
+      listing_name: changes.name,
+      listing_category: changes.category,
+      listing_city: changes.city,
+      listing_area: changes.area,
+      listing_country: changes.country,
+      listing_address: changes.address,
+      listing_description: changes.description,
+      listing_image_url: changes.imageUrl,
+      listing_source_url: changes.sourceUrl,
+    });
+    if (error) throw new Error(error.message);
+    await refresh();
+  }, [refresh]);
+
   const value = useMemo<StoreValue>(() => ({
     ready, dataLoading, configMissing, authError, queryErrors, user, role: user?.role ?? null, permissions,
-    orders, bookings, products, services, partners, loungeLeads, login, logout, changePassword, refresh, setOrderStatus, setBookingStatus, reviewProduct, reviewService, setPartnerStatus,
-  }), [ready, dataLoading, configMissing, authError, queryErrors, user, permissions, orders, bookings, products, services, partners, loungeLeads, login, logout, changePassword, refresh, setOrderStatus, setBookingStatus, reviewProduct, reviewService, setPartnerStatus]);
+    orders, bookings, products, services, partners, loungeLeads, login, logout, changePassword, refresh, setOrderStatus, setBookingStatus, reviewProduct, reviewService, saveProduct, saveService, savePartnerListing, setPartnerStatus,
+  }), [ready, dataLoading, configMissing, authError, queryErrors, user, permissions, orders, bookings, products, services, partners, loungeLeads, login, logout, changePassword, refresh, setOrderStatus, setBookingStatus, reviewProduct, reviewService, saveProduct, saveService, savePartnerListing, setPartnerStatus]);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 

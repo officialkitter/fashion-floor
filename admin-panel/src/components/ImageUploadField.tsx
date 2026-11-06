@@ -37,21 +37,29 @@ export function ImageUploadField({
     }
     setUploading(true);
     setError(null);
+    const uploadedPaths: string[] = [];
     try {
       const uploaded: string[] = [];
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+      if (userError || !userData.user) throw new Error('Sign in again before uploading images.');
       for (const file of selected) {
-        const path = `${(await supabase.auth.getUser()).data.user?.id}/${crypto.randomUUID()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+        const path = `${userData.user.id}/${crypto.randomUUID()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
         const { error: uploadError } = await supabase.storage.from('product-media').upload(path, file, {
           cacheControl: '31536000',
           contentType: file.type,
           upsert: false,
         });
         if (uploadError) throw new Error(uploadError.message);
+        uploadedPaths.push(path);
         const { data } = supabase.storage.from('product-media').getPublicUrl(path);
         uploaded.push(data.publicUrl);
       }
       onChange(multiple ? [...value, ...uploaded] : uploaded.slice(0, 1));
     } catch (reason) {
+      if (uploadedPaths.length) {
+        const { error: cleanupError } = await supabase.storage.from('product-media').remove(uploadedPaths);
+        if (cleanupError) console.error('Could not clean up incomplete listing image upload.', cleanupError);
+      }
       setError(reason instanceof Error ? reason.message : 'The image could not be uploaded.');
     } finally {
       setUploading(false);

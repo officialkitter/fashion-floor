@@ -1,7 +1,7 @@
 'use client';
 
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { CalendarDays, Coffee, LayoutDashboard, LogOut, Menu, Package, Settings, ShieldCheck, ShoppingBag, Store, Users, X } from 'lucide-react';
+import { CalendarDays, ChartNoAxesCombined, Coffee, LayoutDashboard, LogOut, Menu, Package, Settings, ShieldCheck, ShoppingBag, Store, Users, X } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
@@ -12,6 +12,7 @@ import { cn } from '@/lib/utils';
 
 const NAV: { href: string; label: string; icon: LucideIcon; perm: Permission }[] = [
   { href: '/dashboard', label: 'Overview', icon: LayoutDashboard, perm: 'dashboard.view' },
+  { href: '/reports', label: 'Reports', icon: ChartNoAxesCombined, perm: 'dashboard.view' },
   { href: '/orders', label: 'Orders', icon: ShoppingBag, perm: 'orders.view' },
   { href: '/bookings', label: 'Appointments', icon: CalendarDays, perm: 'bookings.view' },
   { href: '/catalog', label: 'Products & approvals', icon: Package, perm: 'catalog.view' },

@@ -1,8 +1,10 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Check, Image as ImageIcon, Package, Search, X } from 'lucide-react';
+import { Check, Image as ImageIcon, Package, Pencil, Search, X } from 'lucide-react';
 import { Button, Card, EmptyState, Img, NoAccess, PageHeader, StatusBadge, Tabs } from '@/components/ui';
+import { ProductEditForm, ServiceEditForm } from '@/components/ListingEditForms';
+import { BulkProductImport } from '@/components/BulkProductImport';
 import { ROLE_LABELS } from '@/lib/rbac';
 import { useAccess, useStore } from '@/lib/store';
 import { getSupabase } from '@/lib/supabase';
@@ -14,11 +16,12 @@ type StatusFilter = 'all' | 'pending' | 'published' | 'rejected';
 
 export default function CatalogPage() {
   const { role, can, own } = useAccess();
-  const { products, services, queryErrors, dataLoading, reviewProduct, reviewService } = useStore();
+  const { products, services, queryErrors, dataLoading, reviewProduct, reviewService, saveProduct, saveService, refresh } = useStore();
   const [section, setSection] = useState<CatalogSection>('products');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [actionId, setActionId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [browseProducts, setBrowseProducts] = useState<Product[]>([]);
   const [browseFetched, setBrowseFetched] = useState(false);
@@ -28,6 +31,8 @@ export default function CatalogPage() {
 
   const ownProducts = own(products);
   const ownServices = own(services);
+  const canEditListings = can('catalog.manage')
+    && (role === 'admin' || role === 'super_admin' || role === 'supplier' || role === 'provider');
 
   useEffect(() => {
     if (section !== 'browse' || browseFetched) return;
@@ -76,6 +81,7 @@ export default function CatalogPage() {
           stock: (row.sizes ?? []).reduce((sum: number, entry: { stock?: number }) => sum + Number(entry.stock ?? 0), 0),
           stockTarget: 0,
           priceConfirmed: true,
+          originalPrice: null,
           brandPartnershipStatus: 'verified',
           brandApprovalStatus: 'published',
           verificationReference: '',
@@ -83,6 +89,15 @@ export default function CatalogPage() {
           partnerStatus: 'approved',
           sizes: row.sizes ?? [],
           images: row.images ?? [],
+          colors: [],
+          material: '',
+          fit: '',
+          care: '',
+          origin: '',
+          shipping: '',
+          returns: '',
+          authenticity: '',
+          season: '',
           active: true,
           approvalStatus: 'published',
           description: row.description ?? '',
@@ -123,6 +138,34 @@ export default function CatalogPage() {
     }
   }
 
+  async function handleSaveProduct(product: Product, changes: Parameters<typeof saveProduct>[1]) {
+    setActionId(product.id);
+    setActionError(null);
+    try {
+      await saveProduct(product, changes);
+      setEditingId(null);
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : 'The product could not be saved.');
+      throw error;
+    } finally {
+      setActionId(null);
+    }
+  }
+
+  async function handleSaveService(service: (typeof services)[number], changes: Parameters<typeof saveService>[1]) {
+    setActionId(service.id);
+    setActionError(null);
+    try {
+      await saveService(service, changes);
+      setEditingId(null);
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : 'The service could not be saved.');
+      throw error;
+    } finally {
+      setActionId(null);
+    }
+  }
+
   const statusTabs = [
     { value: 'all' as const, label: 'All' },
     { value: 'pending' as const, label: 'Awaiting review' },
@@ -143,6 +186,7 @@ export default function CatalogPage() {
       {actionError ? <p role="alert" className="mb-4 rounded-2xl bg-red-50 p-4 text-sm text-red-800">{actionError}</p> : null}
       {queryErrors.products ? <p role="alert" className="mb-4 rounded-2xl bg-red-50 p-4 text-sm text-red-800">Could not load products: {queryErrors.products}</p> : null}
       {queryErrors.services ? <p role="alert" className="mb-4 rounded-2xl bg-red-50 p-4 text-sm text-red-800">Could not load services: {queryErrors.services}</p> : null}
+      {section === 'products' && can('catalog.manage') ? <BulkProductImport onImported={refresh} /> : null}
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <Tabs id="catalog-section" value={section} onChange={(value) => { setSection(value); setSearch(''); }} items={sections} />
         <label className="flex h-11 min-w-56 items-center gap-2 rounded-full bg-white px-4 text-stone ring-1 ring-coffee/10 focus-within:ring-coffee/40">
@@ -177,6 +221,8 @@ export default function CatalogPage() {
                   <p className="mt-4 text-xl font-extrabold text-coffee">{money(product.price, product.currency)}{!product.priceConfirmed ? <span className="ml-2 text-xs font-semibold text-amber-800">Proposed</span> : null}</p>
                   <p className="mt-1 text-sm text-stone">{product.category} · {product.stock} units on hand{product.stockTarget > 0 ? ` · ${product.stockTarget} opening target` : ''}</p>
                   {product.sizes.length ? <p className="mt-3 text-xs text-stone">Stock by size: {product.sizes.map((size) => `${size.size}: ${size.stock}`).join(' · ')}</p> : null}
+                  {canEditListings ? <Button variant="secondary" size="sm" className="mt-4" onClick={() => setEditingId(editingId === product.id ? null : product.id)}><Pencil size={14} aria-hidden="true" /> {editingId === product.id ? 'Close editor' : 'Edit details and photos'}</Button> : null}
+                  {editingId === product.id ? <ProductEditForm product={product} saving={actionId === product.id} onSave={(changes) => handleSaveProduct(product, changes)} /> : null}
                   {product.approvalStatus === 'pending' && can('catalog.approve') ? <div className="mt-4 flex gap-2">
                     <Button variant="success" size="sm" disabled={!canPublish || actionId === product.id} onClick={() => void handleReview('product', product.id, 'published')}><Check size={15} aria-hidden="true" /> Approve</Button>
                     <Button variant="danger" size="sm" disabled={actionId === product.id} onClick={() => void handleReview('product', product.id, 'rejected')}><X size={15} aria-hidden="true" /> Decline</Button>
@@ -206,6 +252,9 @@ export default function CatalogPage() {
                   <div className="flex items-start justify-between gap-3"><div className="min-w-0"><h2 className="font-bold text-coffee">{service.name}</h2><p className="mt-1 truncate text-sm text-stone">{service.businessName} · {service.category}</p></div><StatusBadge status={service.approvalStatus} label={service.approvalStatus === 'pending' ? 'Awaiting review' : service.approvalStatus === 'published' ? 'Approved' : 'Not approved'} /></div>
                   <p className="mt-3 line-clamp-3 text-sm text-stone">{service.description || 'Add service details before requesting approval.'}</p>
                   <p className="mt-4 text-xl font-extrabold text-coffee">{money(service.price, service.currency)}{!service.priceConfirmed ? <span className="ml-2 text-xs font-semibold text-amber-800">Proposed</span> : null}</p><p className="mt-1 text-sm text-stone">{service.durationMinutes} minutes</p>
+                  {service.sourceUrl ? <a href={service.sourceUrl} target="_blank" rel="noreferrer" className="mt-2 block break-all text-xs font-semibold text-coffee underline">Provider source</a> : null}
+                  {canEditListings ? <Button variant="secondary" size="sm" className="mt-4" onClick={() => setEditingId(editingId === service.id ? null : service.id)}><Pencil size={14} aria-hidden="true" /> {editingId === service.id ? 'Close editor' : 'Edit service'}</Button> : null}
+                  {editingId === service.id ? <ServiceEditForm service={service} saving={actionId === service.id} onSave={(changes) => handleSaveService(service, changes)} /> : null}
                   {service.approvalStatus === 'pending' && can('catalog.approve') ? <div className="mt-4 flex gap-2">
                     <Button variant="success" size="sm" disabled={!canPublish || actionId === service.id} onClick={() => void handleReview('service', service.id, 'published')}><Check size={15} aria-hidden="true" /> Approve</Button>
                     <Button variant="danger" size="sm" disabled={actionId === service.id} onClick={() => void handleReview('service', service.id, 'rejected')}><X size={15} aria-hidden="true" /> Decline</Button>

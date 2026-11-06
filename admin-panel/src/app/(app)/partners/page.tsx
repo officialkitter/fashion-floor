@@ -1,20 +1,22 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { Pencil } from 'lucide-react';
 import { Button, Card, EmptyState, Img, NoAccess, PageHeader, StatusBadge, Tabs } from '@/components/ui';
+import { PartnerRecordEditForm, type PartnerRecordChanges } from '@/components/ListingEditForms';
 import { ROLE_LABELS } from '@/lib/rbac';
 import { useAccess, useStore } from '@/lib/store';
 import { dayLabel } from '@/lib/utils';
 import { getSupabase } from '@/lib/supabase';
 
 type PartnerSection = 'partners' | 'stores' | 'providers' | 'brands' | 'directory';
-type StoreRecord = { id: string; vendor_id: string; vendor_name: string; name: string; city: string; country: string; cover_url: string | null; approval_status: string; is_active: boolean };
-type BusinessRecord = { id: string; vendor_id: string; vendor_name: string; name: string; category: string; city: string; area: string; cover_url: string | null; approval_status: string; is_active: boolean };
+type StoreRecord = { id: string; vendor_id: string; vendor_name: string; name: string; city: string; country: string; cover_url: string | null; approval_status: string; is_active: boolean; description?: string | null; address?: string | null };
+type BusinessRecord = { id: string; vendor_id: string; vendor_name: string; name: string; category: string; city: string; area: string; cover_url: string | null; approval_status: string; is_active: boolean; description?: string | null; address?: string | null; source_url?: string | null };
 type BrandRecord = { id: string; name: string; logo_url: string | null; partnership_status: string; approval_status: string; verification_reference: string | null; is_active: boolean };
 
 export default function PartnersPage() {
   const { role, can } = useAccess();
-  const { partners, loungeLeads, queryErrors, dataLoading, setPartnerStatus } = useStore();
+  const { partners, loungeLeads, queryErrors, dataLoading, setPartnerStatus, savePartnerListing } = useStore();
   const [section, setSection] = useState<PartnerSection>('partners');
   const [stores, setStores] = useState<StoreRecord[]>([]);
   const [businesses, setBusinesses] = useState<BusinessRecord[]>([]);
@@ -22,9 +24,13 @@ export default function PartnersPage() {
   const [evidence, setEvidence] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
   const [actionId, setActionId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const canReview = can('partners.manage') && (role === 'admin' || role === 'super_admin');
+  const canEditLocations = can('partners.manage') || (
+    (role === 'supplier' || role === 'provider') && can('catalog.manage')
+  );
 
   const loadReviews = useCallback(async () => {
     const supabase = getSupabase();
@@ -84,6 +90,23 @@ export default function PartnersPage() {
     }
   }
 
+  async function saveLocation(kind: 'store' | 'provider', id: string, changes: PartnerRecordChanges) {
+    setActionId(id);
+    setError(null);
+    setMessage(null);
+    try {
+      await savePartnerListing(kind, id, changes);
+      setMessage(`${kind === 'provider' ? 'Provider' : 'Store'} details saved. The record is awaiting review again.`);
+      setEditingId(null);
+      await loadReviews();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'The listing could not be saved.');
+      throw reason;
+    } finally {
+      setActionId(null);
+    }
+  }
+
   if (!role || !can('partners.view')) return <NoAccess role={role ? ROLE_LABELS[role] : 'your role'} what="suppliers and providers" />;
 
   const sections = [
@@ -134,10 +157,34 @@ export default function PartnersPage() {
       ) : null}
 
       {section === 'stores' ? (
-        <ReviewList loading={loading} empty="No stores are waiting for review." records={stores} canReview={canReview} actionId={actionId} onReview={(id, decision) => void reviewEntity('store', id, decision)} />
+        <ReviewList
+          kind="store"
+          loading={loading}
+          empty="No stores are waiting for review."
+          records={stores}
+          canEdit={canEditLocations}
+          canReview={canReview}
+          actionId={actionId}
+          editingId={editingId}
+          onToggleEdit={(id) => setEditingId(editingId === id ? null : id)}
+          onSave={saveLocation}
+          onReview={(id, decision) => void reviewEntity('store', id, decision)}
+        />
       ) : null}
       {section === 'providers' ? (
-        <ReviewList loading={loading} empty="No service locations are waiting for review." records={businesses} canReview={canReview} actionId={actionId} onReview={(id, decision) => void reviewEntity('business', id, decision)} />
+        <ReviewList
+          kind="provider"
+          loading={loading}
+          empty="No service locations are waiting for review."
+          records={businesses}
+          canEdit={canEditLocations}
+          canReview={canReview}
+          actionId={actionId}
+          editingId={editingId}
+          onToggleEdit={(id) => setEditingId(editingId === id ? null : id)}
+          onSave={saveLocation}
+          onReview={(id, decision) => void reviewEntity('business', id, decision)}
+        />
       ) : null}
       {section === 'brands' ? (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -190,18 +237,28 @@ export default function PartnersPage() {
 }
 
 function ReviewList<T extends StoreRecord | BusinessRecord>({
+  kind,
   loading,
   empty,
   records,
+  canEdit,
   canReview,
   actionId,
+  editingId,
+  onToggleEdit,
+  onSave,
   onReview,
 }: {
+  kind: 'store' | 'provider';
   loading: boolean;
   empty: string;
   records: T[];
+  canEdit: boolean;
   canReview: boolean;
   actionId: string | null;
+  editingId: string | null;
+  onToggleEdit: (id: string) => void;
+  onSave: (kind: 'store' | 'provider', id: string, changes: PartnerRecordChanges) => Promise<void>;
   onReview: (id: string, decision: 'published' | 'rejected') => void;
 }) {
   if (loading) return <p role="status" className="text-sm text-stone">Loading review queue…</p>;
@@ -211,6 +268,9 @@ function ReviewList<T extends StoreRecord | BusinessRecord>({
       {record.cover_url ? <Img src={record.cover_url} alt="" className="mb-4 h-40 w-full rounded-2xl" /> : <div className="mb-4 flex h-40 items-center justify-center rounded-2xl bg-mist text-sm font-semibold text-stone">Verified photo required</div>}
       <div className="flex items-start justify-between gap-3"><div><h2 className="font-bold text-coffee">{record.name}</h2><p className="mt-1 text-sm text-stone">{record.vendor_name}</p></div><StatusBadge status={record.approval_status} /></div>
       <p className="mt-3 text-sm text-stone">{'category' in record ? `${record.category} · ${record.area}, ${record.city}` : `${record.city}, ${record.country}`}</p>
+      {'source_url' in record && record.source_url ? <a href={record.source_url} target="_blank" rel="noreferrer" className="mt-2 block break-all text-xs font-semibold text-coffee underline">Official provider source</a> : null}
+      {canEdit ? <Button variant="secondary" size="sm" className="mt-4" onClick={() => onToggleEdit(record.id)}><Pencil size={14} aria-hidden="true" /> {editingId === record.id ? 'Close editor' : 'Edit details and photos'}</Button> : null}
+      {canEdit && editingId === record.id ? <PartnerRecordEditForm key={`${record.id}-${record.approval_status}`} kind={kind} record={record} saving={actionId === record.id} onSave={(changes) => onSave(kind, record.id, changes)} /> : null}
       {record.approval_status === 'pending' && canReview ? <div className="mt-4 flex gap-2">
         <Button variant="success" size="sm" disabled={actionId === record.id} onClick={() => onReview(record.id, 'published')}>Approve</Button>
         <Button variant="danger" size="sm" disabled={actionId === record.id} onClick={() => onReview(record.id, 'rejected')}>Decline</Button>

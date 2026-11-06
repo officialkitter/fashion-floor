@@ -48,3 +48,49 @@ body {
     transition-duration: 0.01ms !important;
   }
 }
+
+@media print {
+  @page {
+    size: A4 landscape;
+    margin: 12mm;
+  }
+
+  body,
+  html {
+    background: #fff !important;
+    color: #222 !important;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  aside,
+  header,
+  .no-print {
+    display: none !important;
+  }
+
+  .print-report {
+    width: 100%;
+    color: #222;
+    font-size: 10pt;
+  }
+
+  .print-report tr {
+    break-inside: avoid;
+  }
+
+  .print-report table {
+    border-collapse: collapse;
+    width: 100%;
+  }
+
+  .print-report th,
+  .print-report td {
+    border-bottom: 1px solid #ddd;
+    padding: 6px;
+  }
+
+  .print-report .shadow-card {
+    box-shadow: none !important;
+  }
+}

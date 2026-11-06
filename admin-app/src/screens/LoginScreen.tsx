@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { liveModeError } from '../lib/supabase';
 import { Field } from '../shared/components/ui';
@@ -11,6 +12,7 @@ export function LoginScreen() {
   const insets = useSafeAreaInsets();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const loading = useStore((state) => state.loading);
   const error = useStore((state) => state.error);
   const signIn = useStore((state) => state.signIn);
@@ -39,16 +41,29 @@ export function LoginScreen() {
             accessibilityLabel="Email address"
             editable={!loading && !liveModeError}
           />
-          <Field
-            label="Password"
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-            autoComplete="password"
-            textContentType="password"
-            accessibilityLabel="Password"
-            editable={!loading && !liveModeError}
-          />
+          <View style={styles.passwordGroup}>
+            <Field
+              label="Password"
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry={!showPassword}
+              autoComplete="password"
+              textContentType="password"
+              accessibilityLabel="Password"
+              editable={!loading && !liveModeError}
+            />
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
+              accessibilityState={{ selected: showPassword }}
+              onPress={() => setShowPassword((visible) => !visible)}
+              style={styles.passwordToggle}
+              hitSlop={8}
+            >
+              <MaterialCommunityIcons name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={18} color={colors.caramel} />
+              <Text style={styles.passwordToggleText}>{showPassword ? 'Hide password' : 'Show password'}</Text>
+            </Pressable>
+          </View>
           {loading ? <ActivityIndicator color={colors.caramel} accessibilityLabel="Signing in" /> : null}
           <PrimaryButton
             label="Sign in"
@@ -70,6 +85,9 @@ const styles = StyleSheet.create({
   title: { ...type.display, color: colors.white, marginTop: 22 },
   subtitle: { ...type.body, color: colors.cream, marginBottom: 12 },
   form: { gap: 16, marginTop: 8 },
+  passwordGroup: { gap: 8 },
+  passwordToggle: { alignSelf: 'flex-end', flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 4 },
+  passwordToggleText: { color: colors.cream, fontSize: 12, fontWeight: '700' },
   error: { color: '#FFDAD4', backgroundColor: '#60352E', borderRadius: radius.md, padding: 14, fontSize: 14, lineHeight: 20 },
   note: { color: colors.cream, fontSize: 12, lineHeight: 18, marginTop: 12 },
 });

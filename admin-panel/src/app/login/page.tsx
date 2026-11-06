@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowRight, Coffee } from 'lucide-react';
+import { ArrowRight, Coffee, Eye, EyeOff } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { FormEvent, useState } from 'react';
 import { Button, Field, inputCls } from '@/components/ui';
@@ -11,6 +11,7 @@ export default function LoginPage() {
   const { login, configMissing, authError } = useStore();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -49,7 +50,12 @@ export default function LoginPage() {
             <input required className={inputCls} type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} />
           </Field>
           <Field label="Password">
-            <input required className={inputCls} type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} />
+            <div className="relative">
+              <input required className={`${inputCls} pr-12`} type={showPassword ? 'text' : 'password'} autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} />
+              <button type="button" onClick={() => setShowPassword((visible) => !visible)} aria-label={showPassword ? 'Hide password' : 'Show password'} aria-pressed={showPassword} className="absolute inset-y-0 right-3 inline-flex items-center text-stone hover:text-coffee focus-visible:outline focus-visible:outline-2 focus-visible:outline-coffee">
+                {showPassword ? <EyeOff size={18} aria-hidden="true" /> : <Eye size={18} aria-hidden="true" />}
+              </button>
+            </div>
           </Field>
           <Button type="submit" size="lg" className="w-full" disabled={busy || configMissing}>
             {busy ? 'Signing in…' : 'Sign in'} <ArrowRight size={18} aria-hidden="true" />
